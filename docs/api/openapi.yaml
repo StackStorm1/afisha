@@ -40,10 +40,10 @@ info:
     | `NOT_FOUND` | 404 | Ресурс не найден |
     | `EMAIL_ALREADY_TAKEN` | 409 | Email уже зарегистрирован |
     | `INVALID_CREDENTIALS` | 401 | Неверный email или пароль |
-    | `SESSION_NOT_ACTIVE` | 409 | Сеанс отменён или завершён — нельзя купить |
-    | `SESSION_IN_PAST` | 422 | Нельзя создать сеанс с датой в прошлом (BR-02) |
+    | `SESSION_NOT_ACTIVE` | 409 | Сеанс отменён или завершён — нельзя купить (BR-04) |
+    | `SESSION_IN_PAST` | 422 | Нельзя создать сеанс с датой в прошлом (BR-03) |
     | `SESSION_ALREADY_CANCELLED` | 409 | Сеанс уже отменён |
-    | `NO_SEATS_LEFT` | 409 | Недостаточно свободных мест (BR-01) |
+    | `SEAT_ALREADY_TAKEN` | 409 | Одно или несколько мест уже заняты (BR-01) |
     | `ORDER_NOT_CANCELLABLE` | 409 | Бронь уже отменена или завершена |
     | `ORDER_ALREADY_PAID` | 409 | Бронь уже оплачена |
     | `PAYMENT_FAILED` | 402 | Платёж отклонён шлюзом — можно повторить |
@@ -60,7 +60,7 @@ tags:
   - name: events
     description: Каталог событий
   - name: sessions
-    description: Сеансы и доступность мест
+    description: Сеансы и схема зала
   - name: orders
     description: Брони и оплата
   - name: admin
@@ -210,9 +210,11 @@ paths:
               example:
                 data:
                   - id: 1
+                    code: THEATRE
                     name: Театр
                     slug: theatre
                   - id: 2
+                    code: CONCERT
                     name: Концерт
                     slug: concert
 
@@ -230,12 +232,6 @@ paths:
         удовлетворяющий переданным фильтрам.
         Доступен гостям без токена.
       parameters:
-        - name: city
-          in: query
-          description: Фильтр по городу (регистронезависимо)
-          schema:
-            type: string
-            example: Москва
         - name: category
           in: query
           description: Slug категории
@@ -295,6 +291,7 @@ paths:
                     title: Гамлет
                     category:
                       id: 1
+                      code: THEATRE
                       name: Театр
                       slug: theatre
                     age_rating: 16+
@@ -334,10 +331,12 @@ paths:
                   description: Трагедия Шекспира в постановке Товстоногова.
                   category:
                     id: 1
+                    code: THEATRE
                     name: Театр
                     slug: theatre
                   age_rating: 16+
                   poster_url: https://cdn.example.com/hamlet.jpg
+                  nearest_session_at: '2026-10-15T19:00:00Z'
                   min_price: '2000.00'
                   sessions_count: 5
                   created_at: '2026-09-01T00:00:00Z'
@@ -355,12 +354,6 @@ paths:
         Доступен гостям без токена (US-05).
       parameters:
         - $ref: '#/components/parameters/UUIDPath'
-        - name: city
-          in: query
-          description: Фильтр по городу
-          schema:
-            type: string
-            example: Москва
         - name: date_from
           in: query
           schema:
@@ -399,9 +392,16 @@ paths:
                       id: d1e2f3a4-0000-0000-0000-000000000001
                       name: Большой театр
                       address: Театральная пл., 1
-                      city: Москва
-                      capacity: 1700
-                    city: Москва
+                      city:
+                        id: 1
+                        name: Москва
+                        slug: moskva
+                      rows_count: 20
+                      seats_per_row: 30
+                    city:
+                      id: 1
+                      name: Москва
+                      slug: moskva
                     starts_at: '2026-10-15T19:00:00Z'
                     price: '2000.00'
                     total_seats: 300
@@ -439,16 +439,16 @@ paths:
     get:
       operationId: getSessionSeats
       tags: [sessions]
-      summary: Доступность мест сеанса
+      summary: Схема зала сеанса (US-10)
       description: |
-        Возвращает актуальное число свободных мест.
-        Вызывается перед бронированием, чтобы показать актуальный остаток.
-        Схема зала в MVP отсутствует — только счётчики (см. requirements §2).
+        Возвращает схему зала с актуальным статусом каждого места: свободно, занято, выбрано.
+        Вызывается при открытии экрана выбора мест.
+        Места принадлежат площадке; занятость определяется активными бронями на данный сеанс.
       parameters:
         - $ref: '#/components/parameters/UUIDPath'
       responses:
         '200':
-          description: Доступность мест
+          description: Схема зала с местами
           content:
             application/json:
               schema:
@@ -456,14 +456,32 @@ paths:
                 required: [data]
                 properties:
                   data:
-                    $ref: '#/components/schemas/SeatAvailability'
+                    $ref: '#/components/schemas/SeatMap'
               example:
                 data:
                   session_id: c1d2e3f4-0000-0000-0000-000000000001
                   status: active
-                  total_seats: 300
-                  seats_left: 142
-                  price: '2000.00'
+                  base_price: '2000.00'
+                  rows:
+                    - row_no: 1
+                      seats:
+                        - id: a1b2c3d4-0001-0000-0000-000000000001
+                          seat_no: 1
+                          price_category: STALLS
+                          price: '2000.00'
+                          status: free
+                        - id: a1b2c3d4-0001-0000-0000-000000000002
+                          seat_no: 2
+                          price_category: STALLS
+                          price: '2000.00'
+                          status: held
+                    - row_no: 2
+                      seats:
+                        - id: a1b2c3d4-0002-0000-0000-000000000001
+                          seat_no: 1
+                          price_category: BALCONY
+                          price: '1600.00'
+                          status: free
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -475,10 +493,13 @@ paths:
     post:
       operationId: createOrder
       tags: [orders]
-      summary: Создание брони (US-10)
+      summary: Создание брони — выбор мест (US-11)
       description: |
-        Резервирует места атомарным UPDATE с проверкой seats_left >= quantity (BR-01).
-        Созданный заказ имеет статус `pending` — места зарезервированы, оплата ещё не прошла.
+        Удерживает выбранные места на BR-02 минут (15 мин) — создаёт записи в `bookings`
+        со статусом HELD и заполненным `expires_at` (BR-02).
+        Атомарный INSERT с проверкой `uq_bookings_active_seat` гарантирует,
+        что одно место не займут дважды (BR-01).
+        Созданный заказ имеет статус `pending` — места удерживаются, оплата ещё не прошла.
         Для оплаты вызвать `POST /orders/{id}/pay`.
       security:
         - bearerAuth: []
@@ -490,10 +511,12 @@ paths:
               $ref: '#/components/schemas/CreateOrderRequest'
             example:
               session_id: c1d2e3f4-0000-0000-0000-000000000001
-              quantity: 2
+              seat_ids:
+                - a1b2c3d4-0001-0000-0000-000000000001
+                - a1b2c3d4-0001-0000-0000-000000000003
       responses:
         '201':
-          description: Бронь создана, статус pending
+          description: Бронь создана, статус pending, места удерживаются
           content:
             application/json:
               schema:
@@ -502,24 +525,58 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/OrderDetail'
+              example:
+                data:
+                  id: e1f2a3b4-0000-0000-0000-000000000001
+                  session:
+                    id: c1d2e3f4-0000-0000-0000-000000000001
+                    event:
+                      id: b1c2d3e4-0000-0000-0000-000000000001
+                      title: Гамлет
+                      poster_url: https://cdn.example.com/hamlet.jpg
+                    venue:
+                      name: Большой театр
+                      address: Театральная пл., 1
+                      city:
+                        id: 1
+                        name: Москва
+                        slug: moskva
+                    starts_at: '2026-10-15T19:00:00Z'
+                    price: '2000.00'
+                  seats:
+                    - id: a1b2c3d4-0001-0000-0000-000000000001
+                      row_no: 1
+                      seat_no: 1
+                      price_category: STALLS
+                      price: '2000.00'
+                    - id: a1b2c3d4-0001-0000-0000-000000000003
+                      row_no: 1
+                      seat_no: 3
+                      price_category: STALLS
+                      price: '2000.00'
+                  total_price: '4000.00'
+                  status: pending
+                  expires_at: '2026-10-01T10:15:00Z'
+                  created_at: '2026-10-01T10:00:00Z'
+                  updated_at: '2026-10-01T10:00:00Z'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Сеанс неактивен или нет свободных мест
+          description: Сеанс неактивен или место уже занято
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               examples:
-                noSeats:
-                  summary: Нет свободных мест (BR-01, US-13)
+                seatTaken:
+                  summary: Место уже занято (BR-01, US-13)
                   value:
-                    code: NO_SEATS_LEFT
-                    message: На этот сеанс недостаточно свободных мест
+                    code: SEAT_ALREADY_TAKEN
+                    message: Одно или несколько выбранных мест уже заняты
                 sessionNotActive:
-                  summary: Сеанс не активен (BR-03)
+                  summary: Сеанс не активен (BR-04)
                   value:
                     code: SESSION_NOT_ACTIVE
                     message: Сеанс отменён или уже завершён
@@ -529,7 +586,7 @@ paths:
     get:
       operationId: listMyOrders
       tags: [orders]
-      summary: Мои брони (US-14)
+      summary: Мои брони (US-15)
       security:
         - bearerAuth: []
       parameters:
@@ -592,11 +649,11 @@ paths:
     delete:
       operationId: cancelOrder
       tags: [orders]
-      summary: Отмена брони (US-15)
+      summary: Отмена брони (US-17)
       description: |
-        Переводит заказ в статус `cancelled` и возвращает места (seats_left++).
-        Отменить можно только собственную бронь (BR-06).
-        Оплаченную бронь отменить нельзя через API (BR-05 — только через отмену сеанса).
+        Переводит заказ в статус `cancelled` и освобождает места (брони → CANCELLED).
+        Отменить можно только собственную бронь (BR-07).
+        Оплаченную бронь отменить нельзя через API (только через отмену сеанса — BR-06).
       security:
         - bearerAuth: []
       parameters:
@@ -632,12 +689,12 @@ paths:
     post:
       operationId: payOrder
       tags: [orders]
-      summary: Оплата брони (US-11, US-12)
+      summary: Оплата брони (US-14, US-16)
       description: |
         Инициирует оплату через платёжный шлюз (заглушка в MVP).
-        При успехе статус заказа становится `paid`.
-        При отказе шлюза — `failed`, возвращается 402; пользователь может повторить вызов.
-        Места остаются зарезервированными до истечения TTL или явной отмены.
+        При успехе статус заказа становится `paid`, брони переходят в PAID (BR-05).
+        При отказе шлюза — `failed`, возвращается 402; пользователь может повторить вызов (US-16).
+        Места остаются удержанными до истечения `expires_at` или явной отмены (BR-02).
       security:
         - bearerAuth: []
       parameters:
@@ -656,11 +713,41 @@ paths:
               example:
                 data:
                   id: e1f2a3b4-0000-0000-0000-000000000001
+                  session:
+                    id: c1d2e3f4-0000-0000-0000-000000000001
+                    event:
+                      id: b1c2d3e4-0000-0000-0000-000000000001
+                      title: Гамлет
+                      poster_url: https://cdn.example.com/hamlet.jpg
+                    venue:
+                      name: Большой театр
+                      address: Театральная пл., 1
+                      city:
+                        id: 1
+                        name: Москва
+                        slug: moskva
+                    starts_at: '2026-10-15T19:00:00Z'
+                    price: '2000.00'
+                  seats:
+                    - id: a1b2c3d4-0001-0000-0000-000000000001
+                      row_no: 1
+                      seat_no: 1
+                      price_category: STALLS
+                      price: '2000.00'
+                    - id: a1b2c3d4-0001-0000-0000-000000000003
+                      row_no: 1
+                      seat_no: 3
+                      price_category: STALLS
+                      price: '2000.00'
+                  total_price: '4000.00'
                   status: paid
+                  expires_at: null
+                  created_at: '2026-10-01T10:00:00Z'
+                  updated_at: '2026-10-01T10:05:00Z'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
-          description: Платёж отклонён шлюзом — можно повторить (US-12)
+          description: Платёж отклонён шлюзом — можно повторить (US-16)
           content:
             application/json:
               schema:
@@ -701,11 +788,12 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - name: city
+        - name: city_slug
           in: query
+          description: Фильтр по slug города
           schema:
             type: string
-            example: Москва
+            example: moskva
         - name: page
           in: query
           schema:
@@ -742,7 +830,10 @@ paths:
     post:
       operationId: adminCreateVenue
       tags: [admin]
-      summary: Создание площадки
+      summary: Создание площадки и схемы зала (US-19)
+      description: |
+        Создаёт площадку с прямоугольной сеткой мест.
+        После создания сервер генерирует `rows_count × seats_per_row` записей в `seats`.
       security:
         - bearerAuth: []
       requestBody:
@@ -754,8 +845,9 @@ paths:
             example:
               name: Большой театр
               address: Театральная пл., 1
-              city: Москва
-              capacity: 1700
+              city_id: 1
+              rows_count: 20
+              seats_per_row: 30
       responses:
         '201':
           description: Площадка создана
@@ -767,6 +859,17 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/Venue'
+              example:
+                data:
+                  id: d1e2f3a4-0000-0000-0000-000000000001
+                  name: Большой театр
+                  address: Театральная пл., 1
+                  city:
+                    id: 1
+                    name: Москва
+                    slug: moskva
+                  rows_count: 20
+                  seats_per_row: 30
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -778,7 +881,9 @@ paths:
     patch:
       operationId: adminUpdateVenue
       tags: [admin]
-      summary: Редактирование площадки
+      summary: Редактирование площадки (US-22)
+      description: |
+        Нельзя изменить `rows_count` или `seats_per_row`, если есть активные брони (BR-08).
       security:
         - bearerAuth: []
       parameters:
@@ -817,7 +922,7 @@ paths:
     post:
       operationId: adminCreateEvent
       tags: [admin]
-      summary: Создание события (US-17)
+      summary: Создание события (US-20)
       security:
         - bearerAuth: []
       requestBody:
@@ -842,7 +947,21 @@ paths:
                 required: [data]
                 properties:
                   data:
-                    $ref: '#/components/schemas/EventDetail'
+                    $ref: '#/components/schemas/EventBase'
+              example:
+                data:
+                  id: b1c2d3e4-0000-0000-0000-000000000001
+                  title: Гамлет
+                  description: Трагедия Шекспира в постановке Товстоногова.
+                  category:
+                    id: 1
+                    code: THEATRE
+                    name: Театр
+                    slug: theatre
+                  age_rating: 16+
+                  poster_url: https://cdn.example.com/hamlet.jpg
+                  created_at: '2026-09-01T00:00:00Z'
+                  updated_at: '2026-09-01T00:00:00Z'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -854,7 +973,7 @@ paths:
     patch:
       operationId: adminUpdateEvent
       tags: [admin]
-      summary: Редактирование события (US-19)
+      summary: Редактирование события (US-22)
       security:
         - bearerAuth: []
       parameters:
@@ -875,7 +994,7 @@ paths:
                 required: [data]
                 properties:
                   data:
-                    $ref: '#/components/schemas/EventDetail'
+                    $ref: '#/components/schemas/EventBase'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -889,10 +1008,10 @@ paths:
     post:
       operationId: adminCreateSession
       tags: [admin]
-      summary: Добавление сеанса к событию (US-18)
+      summary: Добавление сеанса к событию (US-21)
       description: |
-        Нельзя создать сеанс с `starts_at` в прошлом (BR-02).
-        `total_seats` не может превышать `capacity` площадки.
+        Нельзя создать сеанс с `starts_at` в прошлом (BR-03).
+        `total_seats` не может превышать `rows_count × seats_per_row` площадки.
       security:
         - bearerAuth: []
       parameters:
@@ -930,7 +1049,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          description: Ошибка валидации или дата в прошлом
+          description: Ошибка валидации или дата в прошлом (BR-03)
           content:
             application/json:
               schema:
@@ -944,7 +1063,7 @@ paths:
                       - field: price
                         message: Должна быть неотрицательной
                 pastDate:
-                  summary: Дата в прошлом (BR-02)
+                  summary: Дата в прошлом (BR-03)
                   value:
                     code: SESSION_IN_PAST
                     message: Нельзя создать сеанс с датой в прошлом
@@ -957,9 +1076,9 @@ paths:
     patch:
       operationId: adminUpdateSession
       tags: [admin]
-      summary: Редактирование сеанса (US-19)
+      summary: Редактирование сеанса (US-22)
       description: |
-        Нельзя изменить `starts_at` на дату в прошлом (BR-02).
+        Нельзя изменить `starts_at` на дату в прошлом (BR-03).
         Нельзя уменьшить `total_seats` ниже числа уже купленных билетов.
       security:
         - bearerAuth: []
@@ -995,10 +1114,10 @@ paths:
     post:
       operationId: adminCancelSession
       tags: [admin]
-      summary: Отмена сеанса (US-20)
+      summary: Отмена сеанса (US-23)
       description: |
         Переводит сеанс в статус `cancelled`.
-        Все заказы на этот сеанс переходят в `cancelled`, seats_left освобождается (BR-05).
+        Все заказы на этот сеанс переходят в `cancelled`, брони освобождаются (BR-06).
         Покупатели увидят статус в личном кабинете.
       security:
         - bearerAuth: []
@@ -1018,6 +1137,25 @@ paths:
               example:
                 data:
                   id: c1d2e3f4-0000-0000-0000-000000000001
+                  event_id: b1c2d3e4-0000-0000-0000-000000000001
+                  venue:
+                    id: d1e2f3a4-0000-0000-0000-000000000001
+                    name: Большой театр
+                    address: Театральная пл., 1
+                    city:
+                      id: 1
+                      name: Москва
+                      slug: moskva
+                    rows_count: 20
+                    seats_per_row: 30
+                  city:
+                    id: 1
+                    name: Москва
+                    slug: moskva
+                  starts_at: '2026-10-15T19:00:00Z'
+                  price: '2000.00'
+                  total_seats: 300
+                  seats_left: 0
                   status: cancelled
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1225,15 +1363,37 @@ components:
             user:
               $ref: '#/components/schemas/UserProfile'
 
-    # ── Category ────────────────────────────────────────────────
+    # ── City ────────────────────────────────────────────────────
 
-    Category:
+    City:
       type: object
       required: [id, name, slug]
       properties:
         id:
           type: integer
           example: 1
+        name:
+          type: string
+          maxLength: 100
+          example: Москва
+        slug:
+          type: string
+          maxLength: 100
+          example: moskva
+
+    # ── Category ────────────────────────────────────────────────
+
+    Category:
+      type: object
+      required: [id, code, name, slug]
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          enum: [CONCERT, THEATRE, STANDUP, FESTIVAL]
+          example: THEATRE
         name:
           type: string
           maxLength: 100
@@ -1247,7 +1407,7 @@ components:
 
     Venue:
       type: object
-      required: [id, name, address, city, capacity]
+      required: [id, name, address, city, rows_count, seats_per_row]
       properties:
         id:
           $ref: '#/components/schemas/UUID'
@@ -1260,17 +1420,21 @@ components:
           maxLength: 500
           example: Театральная пл., 1
         city:
-          type: string
-          maxLength: 100
-          example: Москва
-        capacity:
+          $ref: '#/components/schemas/City'
+        rows_count:
           type: integer
           minimum: 1
-          example: 1700
+          maximum: 100
+          example: 20
+        seats_per_row:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 30
 
     CreateVenueRequest:
       type: object
-      required: [name, address, city, capacity]
+      required: [name, address, city_id, rows_count, seats_per_row]
       properties:
         name:
           type: string
@@ -1280,14 +1444,20 @@ components:
           type: string
           maxLength: 500
           example: Театральная пл., 1
-        city:
-          type: string
-          maxLength: 100
-          example: Москва
-        capacity:
+        city_id:
+          type: integer
+          description: ID города. В MVP единственный город — Москва (id=1).
+          example: 1
+        rows_count:
           type: integer
           minimum: 1
-          example: 1700
+          maximum: 100
+          example: 20
+        seats_per_row:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 30
 
     UpdateVenueRequest:
       type: object
@@ -1299,19 +1469,21 @@ components:
         address:
           type: string
           maxLength: 500
-        city:
-          type: string
-          maxLength: 100
-        capacity:
+        rows_count:
           type: integer
           minimum: 1
+          maximum: 100
+        seats_per_row:
+          type: integer
+          minimum: 1
+          maximum: 100
 
     # ── Event ───────────────────────────────────────────────────
 
-    EventSummary:
+    EventBase:
       type: object
-      description: Краткое представление события для каталога
-      required: [id, title, category, nearest_session_at, min_price, sessions_count]
+      description: Базовое представление события (без вычисляемых полей по сеансам)
+      required: [id, title, category, age_rating, created_at, updated_at]
       properties:
         id:
           $ref: '#/components/schemas/UUID'
@@ -1319,43 +1491,45 @@ components:
           type: string
           maxLength: 255
           example: Гамлет
+        description:
+          type: ['string', 'null']
+          example: Трагедия Шекспира в постановке Товстоногова.
         category:
           $ref: '#/components/schemas/Category'
         age_rating:
           type: string
-          nullable: true
-          enum: ['0+', '6+', '12+', '16+', '18+', null]
+          enum: ['0+', '6+', '12+', '16+', '18+']
           example: 16+
         poster_url:
-          type: string
-          nullable: true
+          type: ['string', 'null']
           maxLength: 500
           example: https://cdn.example.com/hamlet.jpg
-        nearest_session_at:
+        created_at:
           $ref: '#/components/schemas/Timestamp'
-        min_price:
-          $ref: '#/components/schemas/Money'
-        sessions_count:
-          type: integer
-          minimum: 0
-          example: 5
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    EventSummary:
+      type: object
+      description: Краткое представление события для каталога
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          properties:
+            nearest_session_at:
+              $ref: '#/components/schemas/Timestamp'
+            min_price:
+              $ref: '#/components/schemas/Money'
+            sessions_count:
+              type: integer
+              minimum: 0
+              example: 5
 
     EventDetail:
       type: object
-      description: Полное представление события для карточки
+      description: Полное представление события для карточки (включает вычисляемые поля если есть сеансы)
       allOf:
         - $ref: '#/components/schemas/EventSummary'
-        - type: object
-          required: [created_at, updated_at]
-          properties:
-            description:
-              type: string
-              nullable: true
-              example: Трагедия Шекспира в постановке Товстоногова.
-            created_at:
-              $ref: '#/components/schemas/Timestamp'
-            updated_at:
-              $ref: '#/components/schemas/Timestamp'
 
     EventListResponse:
       type: object
@@ -1370,27 +1544,24 @@ components:
 
     CreateEventRequest:
       type: object
-      required: [title, category_id]
+      required: [title, category_id, age_rating]
       properties:
         title:
           type: string
           maxLength: 255
           example: Гамлет
         description:
-          type: string
-          nullable: true
+          type: ['string', 'null']
           example: Трагедия Шекспира в постановке Товстоногова.
         category_id:
           type: integer
           example: 1
         age_rating:
           type: string
-          nullable: true
           enum: ['0+', '6+', '12+', '16+', '18+']
           example: 16+
         poster_url:
-          type: string
-          nullable: true
+          type: ['string', 'null']
           maxLength: 500
           example: https://cdn.example.com/hamlet.jpg
 
@@ -1402,17 +1573,14 @@ components:
           type: string
           maxLength: 255
         description:
-          type: string
-          nullable: true
+          type: ['string', 'null']
         category_id:
           type: integer
         age_rating:
           type: string
-          nullable: true
           enum: ['0+', '6+', '12+', '16+', '18+']
         poster_url:
-          type: string
-          nullable: true
+          type: ['string', 'null']
           maxLength: 500
 
     # ── Session ─────────────────────────────────────────────────
@@ -1428,9 +1596,7 @@ components:
         venue:
           $ref: '#/components/schemas/Venue'
         city:
-          type: string
-          maxLength: 100
-          example: Москва
+          $ref: '#/components/schemas/City'
         starts_at:
           $ref: '#/components/schemas/Timestamp'
         price:
@@ -1448,10 +1614,46 @@ components:
           enum: [active, cancelled, completed]
           example: active
 
-    SeatAvailability:
+    # ── Seat map ─────────────────────────────────────────────────
+
+    SeatInfo:
       type: object
-      description: Актуальная доступность мест сеанса
-      required: [session_id, status, total_seats, seats_left, price]
+      required: [id, seat_no, price_category, price, status]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        seat_no:
+          type: integer
+          minimum: 1
+          example: 12
+        price_category:
+          type: string
+          enum: [STALLS, BALCONY]
+          example: STALLS
+        price:
+          $ref: '#/components/schemas/Money'
+        status:
+          type: string
+          enum: [free, held, paid]
+          example: free
+
+    SeatRow:
+      type: object
+      required: [row_no, seats]
+      properties:
+        row_no:
+          type: integer
+          minimum: 1
+          example: 5
+        seats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeatInfo'
+
+    SeatMap:
+      type: object
+      description: Схема зала с актуальным статусом каждого места
+      required: [session_id, status, price, rows]
       properties:
         session_id:
           $ref: '#/components/schemas/UUID'
@@ -1459,16 +1661,12 @@ components:
           type: string
           enum: [active, cancelled, completed]
           example: active
-        total_seats:
-          type: integer
-          minimum: 1
-          example: 300
-        seats_left:
-          type: integer
-          minimum: 0
-          example: 142
         price:
           $ref: '#/components/schemas/Money'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeatRow'
 
     CreateSessionRequest:
       type: object
@@ -1503,15 +1701,39 @@ components:
 
     CreateOrderRequest:
       type: object
-      required: [session_id, quantity]
+      required: [session_id, seat_ids]
       properties:
         session_id:
           $ref: '#/components/schemas/UUID'
-        quantity:
+        seat_ids:
+          type: array
+          description: UUID мест, выбранных на схеме зала
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/UUID'
+
+    BookedSeat:
+      type: object
+      description: Место в составе заказа
+      required: [id, row_no, seat_no, price_category, price]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        row_no:
           type: integer
           minimum: 1
-          maximum: 10
-          example: 2
+          example: 5
+        seat_no:
+          type: integer
+          minimum: 1
+          example: 12
+        price_category:
+          type: string
+          enum: [STALLS, BALCONY]
+          example: STALLS
+        price:
+          $ref: '#/components/schemas/Money'
 
     OrderSessionRef:
       type: object
@@ -1530,8 +1752,7 @@ components:
               type: string
               example: Гамлет
             poster_url:
-              type: string
-              nullable: true
+              type: ['string', 'null']
               example: https://cdn.example.com/hamlet.jpg
         venue:
           type: object
@@ -1544,8 +1765,7 @@ components:
               type: string
               example: Театральная пл., 1
             city:
-              type: string
-              example: Москва
+              $ref: '#/components/schemas/City'
         starts_at:
           $ref: '#/components/schemas/Timestamp'
         price:
@@ -1553,22 +1773,28 @@ components:
 
     OrderDetail:
       type: object
-      required: [id, session, quantity, total_price, status, created_at, updated_at]
+      required: [id, session, seats, total_price, status, expires_at, created_at, updated_at]
       properties:
         id:
           $ref: '#/components/schemas/UUID'
         session:
           $ref: '#/components/schemas/OrderSessionRef'
-        quantity:
-          type: integer
-          minimum: 1
-          example: 2
+        seats:
+          type: array
+          description: Забронированные места
+          items:
+            $ref: '#/components/schemas/BookedSeat'
         total_price:
           $ref: '#/components/schemas/Money'
         status:
           type: string
           enum: [pending, paid, cancelled, failed]
           example: pending
+        expires_at:
+          type: ['string', 'null']
+          format: date-time
+          description: Время истечения удержания мест. Заполнено только для статуса pending (BR-02).
+          example: '2026-10-01T10:15:00Z'
         created_at:
           $ref: '#/components/schemas/Timestamp'
         updated_at:
