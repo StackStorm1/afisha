@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import select
@@ -25,7 +26,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/health")
-async def health(db: AsyncSession = Depends(get_async_db)):
+async def health(db: Annotated[AsyncSession, Depends(get_async_db)]):
     try:
         await db.execute(select(1))
     except (SQLAlchemyError, OSError) as exc:
