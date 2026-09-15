@@ -5,9 +5,19 @@ on:
     branches: [main]
   pull_request:
 
+# Новый пуш в ту же ветку отменяет предыдущий прогон: устаревший коммит
+# проверять незачем.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Токену прогона достаточно права читать код.
+permissions:
+  contents: read
+
 jobs:
   backend:
-    name: Линтер backend
+    name: Линтер и тесты backend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -16,12 +26,31 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Файла .env в репозитории нет: он в .gitignore и хранит секреты.
+      - name: Создать .env из образца
+        working-directory: .
+        run: cp .env.example .env
+
+      # Тот же docker-compose.yml, что и локально: имя базы, пользователь,
+      # пароль и порт берутся из .env, в workflow не продублировано ни одно
+      # значение. --wait дожидается healthcheck, описанного в compose.
+      - name: Поднять Postgres
+        working-directory: .
+        run: docker compose up -d --wait db
+
       # Полная версия, а не плавающий мажор: setup-uv не поддерживает тег v10,
       # его подвижные мажорные теги обрываются на v7.
       - uses: astral-sh/setup-uv@v10.1.0
         with:
           version: "0.9.16"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
 
       - run: uv sync --locked
 
       - run: uv run ruff check .
+
+      - run: uv run ruff format --check .
+
+      # Команда слово в слово из README.
+      - run: uv run --env-file ../.env pytest -q
