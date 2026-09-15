@@ -1,14 +1,37 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.core.config import get_settings
+from app.core.logging import setup_logging
 from app.db.session import AsyncSession, get_async_db
 
-app = FastAPI()
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    # Настройки читаются на старте приложения, а не при импорте модуля:
+    # импорт app.main не должен требовать заполненного окружения.
+    setup_logging(get_settings().log_level)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
 
 @app.get("/health")
 async def health(db: AsyncSession = Depends(get_async_db)):
     try:
-        res = (await db.scalars(select(1))).first()
-        return {'status': 'ok'}
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='Сервис недоступен')
-        
+        await db.execute(select(1))
+    except (SQLAlchemyError, OSError) as exc:
+        logger.exception("Проверка доступности БД не прошла")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Сервис недоступен",
+        ) from exc
+    return {"status": "ok"}

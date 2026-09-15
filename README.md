@@ -30,7 +30,18 @@ docker compose up -d db
 ```bash
 cd backend
 uv sync
-uv run uvicorn app.main:app --reload
+uv run --env-file ../.env uvicorn app.main:app --reload
+```
+
+`--env-file` обязателен. Приложение читает только переменные окружения и не
+открывает `.env` само: в контейнере окружение наполняет docker-compose, на
+хост-машине — эта команда. Путь загрузки настроек один и тот же везде, поэтому
+конфигурация в Docker и локально не может незаметно разойтись.
+
+Чтобы не повторять флаг, его можно задать один раз на сессию:
+
+```bash
+export UV_ENV_FILE=../.env
 ```
 
 ## Тесты и линтер
@@ -38,6 +49,10 @@ uv run uvicorn app.main:app --reload
 Выполнять из `backend/`:
 
 ```bash
-uv run pytest
+uv run --env-file ../.env pytest
 uv run ruff check .
+uv run ruff format --check .
 ```
+
+Тестам нужен поднятый Postgres (`docker compose up -d db`) — проверка `/health`
+ходит в базу. Линтеру и форматтеру окружение не нужно.
