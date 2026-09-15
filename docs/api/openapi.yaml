@@ -1,0 +1,2125 @@
+openapi: 3.1.0
+
+info:
+  title: Afisha API
+  version: 1.0.0
+  description: |
+    REST API для сервиса Афиша — каталог событий и бронирование билетов.
+
+    ## Аутентификация
+    Защищённые endpoints требуют заголовок `Authorization: Bearer <token>`.
+    Токен выдаётся при регистрации или входе.
+
+    ### Жизненный цикл токена
+    Один access-токен, без refresh-токена. Срок жизни — **7 суток**
+    (`expires_in: 604800` в ответе `/auth/register` и `/auth/login`).
+    Этого достаточно для US-09 «оставаться авторизованным между визитами»:
+    фронт хранит токен и при старте приложения проверяет его через `GET /auth/me`.
+
+    По истечении срока любой защищённый endpoint возвращает `401` с кодом
+    `TOKEN_EXPIRED` — фронт очищает хранилище и ведёт пользователя на вход.
+    Ротация и отзыв токенов в MVP не реализуются: это отдельное хранилище
+    сессий и инвалидация, в срок не помещается.
+
+    ## Роли
+    | Роль | Описание |
+    |---|---|
+    | `visitor` | Авторизованный посетитель — покупка билетов, личный кабинет |
+    | `admin` | Администратор — управление событиями, сеансами, площадками |
+
+    Гость (неавторизованный) может читать каталог без токена.
+    Endpoints под `/admin/` требуют роль `admin`.
+
+    `403` возвращается только при недостаточной роли (endpoints `/admin/`).
+    Чужой заказ отдаётся как `404`, а не `403`, чтобы не раскрывать факт его
+    существования (BR-07).
+
+    ## Регистр перечислений
+    Все перечисления в API — **в нижнем регистре** (`active`, `pending`,
+    `visitor`, `theatre`, `stalls`). В базе те же значения хранятся в верхнем
+    (`ACTIVE`, `PENDING`); преобразование выполняется на границе сериализации.
+    Исключений нет.
+
+    ## Формат ошибки
+    Все ошибки возвращают единый объект:
+    ```json
+    {
+      "code":    "VALIDATION_ERROR",
+      "message": "Текст ошибки",
+      "details": [
+        { "field": "email", "message": "Некорректный формат" }
+      ]
+    }
+    ```
+    `details` — необязательный массив уточнений. В элементе всегда есть
+    `message`, а адресующее поле зависит от кода ошибки:
+
+    | code | поле-адрес | что в нём |
+    |---|---|---|
+    | `VALIDATION_ERROR` | `field` | имя поля запроса |
+    | `SEAT_ALREADY_TAKEN` | `seat_id` | UUID перехваченного места |
+
+    При прочих кодах `details` отсутствует.
+
+    ## Коды ошибок
+    | code | HTTP | Описание |
+    |---|---|---|
+    | `VALIDATION_ERROR` | 422 | Нарушены правила валидации полей |
+    | `UNAUTHORIZED` | 401 | Токен отсутствует или недействителен |
+    | `FORBIDDEN` | 403 | Нет прав на ресурс (недостаточная роль) |
+    | `NOT_FOUND` | 404 | Ресурс не найден |
+    | `EMAIL_ALREADY_TAKEN` | 409 | Email уже зарегистрирован |
+    | `INVALID_CREDENTIALS` | 401 | Неверный email или пароль |
+    | `SESSION_NOT_ACTIVE` | 409 | Сеанс отменён или завершён — нельзя купить (BR-04) |
+    | `SESSION_IN_PAST` | 422 | Нельзя создать сеанс с датой в прошлом (BR-03) |
+    | `SESSION_ALREADY_CANCELLED` | 409 | Сеанс уже отменён |
+    | `SEAT_ALREADY_TAKEN` | 409 | Одно или несколько мест уже заняты (BR-01) |
+    | `ORDER_NOT_CANCELLABLE` | 409 | Заказ уже отменён или платёж провалился |
+    | `ORDER_ALREADY_PAID` | 409 | Заказ уже оплачен |
+    | `BOOKING_EXPIRED` | 409 | Срок удержания мест истёк (BR-02) |
+    | `SESSION_ALREADY_STARTED` | 409 | Сеанс уже начался — отмена невозможна (US-17) |
+    | `VENUE_BUSY` | 409 | На площадке уже есть сеанс в это время |
+    | `PAYMENT_FAILED` | 402 | Платёж отклонён шлюзом — можно повторить |
+    | `TOKEN_EXPIRED` | 401 | Срок жизни токена истёк — требуется повторный вход |
+    | `INTERNAL_ERROR` | 500 | Непредвиденная ошибка сервера |
+
+    `INTERNAL_ERROR` может вернуть любой endpoint, поэтому `500` описан у всех операций.
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+tags:
+  - name: auth
+    description: Регистрация, вход, профиль
+  - name: categories
+    description: Категории событий
+  - name: cities
+    description: Города
+  - name: events
+    description: Каталог событий
+  - name: sessions
+    description: Сеансы и схема зала
+  - name: orders
+    description: Брони и оплата
+  - name: admin
+    description: Управление контентом (роль admin)
+
+paths:
+
+  # ─────────────────────────────────────────────────────────────
+  # AUTH
+  # ─────────────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Регистрация пользователя (US-08)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              email: user@example.com
+              password: s3cr3tPass
+      responses:
+        '201':
+          description: Пользователь создан, токен выдан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                data:
+                  token: eyJhbGciOiJIUzI1NiJ9...
+                  expires_in: 604800
+                  user:
+                    id: a1b2c3d4-0000-0000-0000-000000000001
+                    email: user@example.com
+                    role: visitor
+                    created_at: '2026-09-11T10:00:00Z'
+        '409':
+          description: Email уже зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: EMAIL_ALREADY_TAKEN
+                message: Пользователь с таким email уже существует
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Вход пользователя (US-09)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: user@example.com
+              password: s3cr3tPass
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                data:
+                  token: eyJhbGciOiJIUzI1NiJ9...
+                  expires_in: 604800
+                  user:
+                    id: a1b2c3d4-0000-0000-0000-000000000001
+                    email: user@example.com
+                    role: visitor
+                    created_at: '2026-09-11T10:00:00Z'
+        '401':
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: INVALID_CREDENTIALS
+                message: Неверный email или пароль
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Профиль текущего пользователя
+      description: |
+        Используется для восстановления сессии после перезагрузки страницы.
+        Фронт вызывает при старте приложения, если в localStorage есть токен (US-09).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+              example:
+                data:
+                  id: a1b2c3d4-0000-0000-0000-000000000001
+                  email: user@example.com
+                  role: visitor
+                  created_at: '2026-09-11T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # CITIES
+  # ─────────────────────────────────────────────────────────────
+
+  /cities:
+    get:
+      operationId: listCities
+      tags: [cities]
+      summary: Список городов
+      description: |
+        Справочник городов. В MVP он состоит из одной строки — Москвы
+        (requirements §7: «только Москва, поле города в модели есть, фильтра нет»).
+        Endpoint существует, чтобы админская форма создания площадки получала
+        `city_id` из справочника, а не хранила зашитую константу `1`.
+      responses:
+        '200':
+          description: Список городов
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/City'
+              example:
+                data:
+                  - id: 1
+                    name: Москва
+                    slug: moskva
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # CATEGORIES
+  # ─────────────────────────────────────────────────────────────
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: Список категорий
+      description: Используется для рендера фильтров в каталоге.
+      responses:
+        '200':
+          description: Список категорий
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+              example:
+                data:
+                  - id: 1
+                    code: theatre
+                    name: Театр
+                    slug: theatre
+                  - id: 2
+                    code: concert
+                    name: Концерт
+                    slug: concert
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # EVENTS
+  # ─────────────────────────────────────────────────────────────
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: Каталог событий с фильтрами
+      description: |
+        Возвращает события, у которых есть хотя бы один активный сеанс,
+        удовлетворяющий переданным фильтрам.
+        Доступен гостям без токена.
+      parameters:
+        - name: category
+          in: query
+          description: Slug категории
+          schema:
+            type: string
+            example: theatre
+        - name: date_from
+          in: query
+          description: Нижняя граница даты начала сеанса (ISO 8601 date)
+          schema:
+            type: string
+            format: date
+            example: '2026-10-01'
+        - name: date_to
+          in: query
+          description: Верхняя граница даты начала сеанса (ISO 8601 date, включительно до конца дня)
+          schema:
+            type: string
+            format: date
+            example: '2026-10-31'
+        - name: q
+          in: query
+          description: Полнотекстовый поиск по названию и описанию (US-02)
+          schema:
+            type: string
+            example: Гамлет
+        - name: sort
+          in: query
+          description: Сортировка результатов (US-06)
+          schema:
+            type: string
+            enum: [date_asc, date_desc, price_asc, price_desc]
+            default: date_asc
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Постранично список событий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+              example:
+                data:
+                  - id: b1c2d3e4-0000-0000-0000-000000000001
+                    title: Гамлет
+                    category:
+                      id: 1
+                      code: theatre
+                      name: Театр
+                      slug: theatre
+                    age_rating: 16+
+                    poster_url: https://cdn.example.com/hamlet.jpg
+                    nearest_session_at: '2026-10-15T19:00:00Z'
+                    min_price: '2000.00'
+                    sessions_count: 5
+                pagination:
+                  page: 1
+                  per_page: 20
+                  total: 1
+                  total_pages: 1
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Карточка события
+      description: Доступна гостям без токена (US-04).
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Детали события
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EventDetail'
+              example:
+                data:
+                  id: b1c2d3e4-0000-0000-0000-000000000001
+                  title: Гамлет
+                  description: Трагедия Шекспира в постановке Товстоногова.
+                  category:
+                    id: 1
+                    code: theatre
+                    name: Театр
+                    slug: theatre
+                  age_rating: 16+
+                  poster_url: https://cdn.example.com/hamlet.jpg
+                  nearest_session_at: '2026-10-15T19:00:00Z'
+                  min_price: '2000.00'
+                  sessions_count: 5
+                  created_at: '2026-09-01T00:00:00Z'
+                  updated_at: '2026-09-10T12:00:00Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /events/{id}/sessions:
+    get:
+      operationId: listEventSessions
+      tags: [sessions]
+      summary: Список сеансов события
+      description: |
+        Возвращает сеансы события. По умолчанию только активные.
+        Доступен гостям без токена (US-05).
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          description: Статус сеанса (по умолчанию active)
+          schema:
+            type: string
+            enum: [active, cancelled, completed]
+            default: active
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Список сеансов события, сортировка по starts_at по возрастанию
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              example:
+                data:
+                  - id: c1d2e3f4-0000-0000-0000-000000000001
+                    event_id: b1c2d3e4-0000-0000-0000-000000000001
+                    venue:
+                      id: d1e2f3a4-0000-0000-0000-000000000001
+                      name: Большой театр
+                      address: Театральная пл., 1
+                      city:
+                        id: 1
+                        name: Москва
+                        slug: moskva
+                      rows_count: 20
+                      seats_per_row: 30
+                    city:
+                      id: 1
+                      name: Москва
+                      slug: moskva
+                    starts_at: '2026-10-15T19:00:00Z'
+                    price: '2000.00'
+                    total_seats: 300
+                    seats_left: 142
+                    status: active
+                pagination:
+                  page: 1
+                  per_page: 50
+                  total: 5
+                  total_pages: 1
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # SESSIONS
+  # ─────────────────────────────────────────────────────────────
+
+  /sessions/{id}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Детали сеанса
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Детали сеанса
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Session'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /sessions/{id}/seats:
+    get:
+      operationId: getSessionSeats
+      tags: [sessions]
+      summary: Схема зала сеанса (US-10)
+      description: |
+        Возвращает схему зала с актуальным статусом каждого места.
+        Места принадлежат площадке; занятость определяется активными бронями
+        (`HELD` или `PAID`) на данный сеанс.
+
+        Авторизация необязательна. Гость получает `held_by_me: false` у всех мест.
+        Для авторизованного пользователя `held_by_me: true` стоит у мест, которые
+        удерживает он сам, — это позволяет восстановить экран выбора мест после
+        перезагрузки страницы и продолжить отсчёт по `expires_at` его заказа (US-12).
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Схема зала с местами
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SeatMap'
+              example:
+                data:
+                  session_id: c1d2e3f4-0000-0000-0000-000000000001
+                  status: active
+                  price: '2000.00'
+                  rows:
+                    - row_no: 1
+                      seats:
+                        - id: a1b2c3d4-0001-0000-0000-000000000001
+                          seat_no: 1
+                          price_category: stalls
+                          price: '2000.00'
+                          status: free
+                          held_by_me: false
+                        - id: a1b2c3d4-0001-0000-0000-000000000002
+                          seat_no: 2
+                          price_category: stalls
+                          price: '2000.00'
+                          status: held
+                          held_by_me: true
+                        - id: a1b2c3d4-0001-0000-0000-000000000003
+                          seat_no: 3
+                          price_category: stalls
+                          price: '2000.00'
+                          status: paid
+                          held_by_me: false
+                    - row_no: 2
+                      seats:
+                        - id: a1b2c3d4-0002-0000-0000-000000000001
+                          seat_no: 1
+                          price_category: balcony
+                          price: '1600.00'
+                          status: free
+                          held_by_me: false
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # ORDERS
+  # ─────────────────────────────────────────────────────────────
+
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Создание брони — выбор мест (US-11)
+      description: |
+        Удерживает выбранные места на 15 минут (BR-02): в одной транзакции
+        создаётся заказ со статусом `pending` и по записи в `bookings` на каждое
+        место — статус `HELD`, заполненный `expires_at`, проставленный `order_id`.
+
+        Одно место не займут дважды: вставка опирается на частичный уникальный
+        индекс `uq_bookings_active_seat (session_id, seat_id) WHERE status IN
+        ('HELD','PAID')`, и нарушение уникальности транслируется в
+        `SEAT_ALREADY_TAKEN`, а не проверяется запросом перед вставкой (BR-01).
+
+        Заказ создаётся сразу, вместе с удержанием, а не в момент оплаты. Это даёт
+        клиенту один ресурс с одним жизненным циклом и одним таймером: удержание,
+        отмена и истечение срока выражаются переходами статуса заказа, и не
+        возникает «ничьих» броней без владельца. Следствие: `bookings.order_id`
+        заполнен с самого начала и никогда не бывает NULL.
+
+        Оплата — отдельным вызовом `POST /orders/{id}/pay`.
+
+        Истечение срока обрабатывает фоновая задача (раз в минуту): брони
+        переходят в `EXPIRED`, заказ — в `cancelled`, места освобождаются.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            example:
+              session_id: c1d2e3f4-0000-0000-0000-000000000001
+              seat_ids:
+                - a1b2c3d4-0001-0000-0000-000000000001
+                - a1b2c3d4-0001-0000-0000-000000000003
+      responses:
+        '201':
+          description: Бронь создана, статус pending, места удерживаются
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+              example:
+                data:
+                  id: e1f2a3b4-0000-0000-0000-000000000001
+                  session:
+                    id: c1d2e3f4-0000-0000-0000-000000000001
+                    event:
+                      id: b1c2d3e4-0000-0000-0000-000000000001
+                      title: Гамлет
+                      poster_url: https://cdn.example.com/hamlet.jpg
+                    venue:
+                      name: Большой театр
+                      address: Театральная пл., 1
+                      city:
+                        id: 1
+                        name: Москва
+                        slug: moskva
+                    starts_at: '2026-10-15T19:00:00Z'
+                    price: '2000.00'
+                  seats:
+                    - id: a1b2c3d4-0001-0000-0000-000000000001
+                      row_no: 1
+                      seat_no: 1
+                      price_category: stalls
+                      price: '2000.00'
+                    - id: a1b2c3d4-0001-0000-0000-000000000003
+                      row_no: 1
+                      seat_no: 3
+                      price_category: stalls
+                      price: '2000.00'
+                  total_price: '4000.00'
+                  status: pending
+                  expires_at: '2026-10-01T10:15:00Z'
+                  created_at: '2026-10-01T10:00:00Z'
+                  updated_at: '2026-10-01T10:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Сеанс неактивен или место уже занято
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                seatTaken:
+                  summary: Место уже занято (BR-01, US-13)
+                  value:
+                    code: SEAT_ALREADY_TAKEN
+                    message: Одно или несколько выбранных мест уже заняты
+                    details:
+                      - seat_id: a1b2c3d4-0001-0000-0000-000000000003
+                        message: Ряд 1, место 3 уже занято
+                sessionNotActive:
+                  summary: Сеанс не активен (BR-04)
+                  value:
+                    code: SESSION_NOT_ACTIVE
+                    message: Сеанс отменён или уже завершён
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      operationId: listMyOrders
+      tags: [orders]
+      summary: Мои брони (US-15)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Фильтр по статусу брони
+          schema:
+            type: string
+            enum: [pending, paid, cancelled, failed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Брони текущего пользователя (сортировка по created_at desc)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Детали брони
+      description: |
+        Пользователь видит только свои заказы (BR-07). Чужой заказ отдаётся как
+        `404`, а не `403`: иначе по коду ответа можно перебором установить,
+        какие идентификаторы заказов существуют.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Детали брони
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/OrderNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      operationId: cancelOrder
+      tags: [orders]
+      summary: Отмена заказа (US-17)
+      description: |
+        Переводит заказ в статус `cancelled` и освобождает места
+        (брони → `CANCELLED`), в одной транзакции.
+
+        Отменить можно заказ в статусе `pending` или `paid` — US-17 разрешает
+        отказаться от покупки, пока сеанс не начался. Условие одно: текущее время
+        меньше `session.starts_at`, иначе `SESSION_ALREADY_STARTED`.
+
+        Возврат денег при отмене оплаченного заказа вне контура MVP
+        (requirements §4: «отмена заказа освобождает места; денежная часть вне
+        контура»). API освобождает места и фиксирует статус, платёжных операций
+        не выполняет.
+
+        Пользователь отменяет только свои заказы (BR-07); чужой заказ — `404`.
+        Массовая отмена при снятии сеанса — отдельный сценарий администратора (BR-06).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Бронь отменена
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/OrderNotFound'
+        '409':
+          description: Заказ нельзя отменить
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                sessionStarted:
+                  summary: Сеанс уже начался (US-17)
+                  value:
+                    code: SESSION_ALREADY_STARTED
+                    message: Сеанс уже начался, отмена невозможна
+                notCancellable:
+                  summary: Заказ уже в конечном статусе
+                  value:
+                    code: ORDER_NOT_CANCELLABLE
+                    message: Заказ уже отменён
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      tags: [orders]
+      summary: Оплата заказа (US-14, US-16)
+      description: |
+        Инициирует оплату через платёжный шлюз (заглушка в MVP).
+
+        При успехе заказ переходит в `paid`, брони — в `PAID`, `expires_at`
+        обнуляется: удержание превращается в покупку (BR-05).
+
+        При отказе шлюза заказ переходит в `failed`, возвращается `402`. Места
+        остаются удержанными до `expires_at`, поэтому повторный вызов этого же
+        endpoint допустим и выбирать места заново не нужно (US-16).
+
+        Если срок удержания уже истёк, оплата невозможна: возвращается `409`
+        с кодом `BOOKING_EXPIRED` (BR-02). Фоновая задача к этому моменту уже
+        перевела заказ в `cancelled`, а места освободила — фронт показывает
+        сообщение и возвращает пользователя на схему зала.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Оплата прошла успешно, статус заказа — paid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/OrderDetail'
+              example:
+                data:
+                  id: e1f2a3b4-0000-0000-0000-000000000001
+                  session:
+                    id: c1d2e3f4-0000-0000-0000-000000000001
+                    event:
+                      id: b1c2d3e4-0000-0000-0000-000000000001
+                      title: Гамлет
+                      poster_url: https://cdn.example.com/hamlet.jpg
+                    venue:
+                      name: Большой театр
+                      address: Театральная пл., 1
+                      city:
+                        id: 1
+                        name: Москва
+                        slug: moskva
+                    starts_at: '2026-10-15T19:00:00Z'
+                    price: '2000.00'
+                  seats:
+                    - id: a1b2c3d4-0001-0000-0000-000000000001
+                      row_no: 1
+                      seat_no: 1
+                      price_category: stalls
+                      price: '2000.00'
+                    - id: a1b2c3d4-0001-0000-0000-000000000003
+                      row_no: 1
+                      seat_no: 3
+                      price_category: stalls
+                      price: '2000.00'
+                  total_price: '4000.00'
+                  status: paid
+                  expires_at: null
+                  created_at: '2026-10-01T10:00:00Z'
+                  updated_at: '2026-10-01T10:05:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: Платёж отклонён шлюзом — можно повторить (US-16)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: PAYMENT_FAILED
+                message: Платёж отклонён. Проверьте данные карты и попробуйте снова
+        '404':
+          $ref: '#/components/responses/OrderNotFound'
+        '409':
+          description: Заказ уже оплачен, отменён или срок удержания истёк
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                alreadyPaid:
+                  summary: Заказ уже оплачен
+                  value:
+                    code: ORDER_ALREADY_PAID
+                    message: Заказ уже оплачен
+                expired:
+                  summary: Срок удержания мест истёк (BR-02, US-12)
+                  value:
+                    code: BOOKING_EXPIRED
+                    message: Срок удержания мест истёк. Выберите места заново
+                cancelled:
+                  summary: Заказ отменён
+                  value:
+                    code: ORDER_NOT_CANCELLABLE
+                    message: Нельзя оплатить отменённый заказ
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # ADMIN — VENUES
+  # ─────────────────────────────────────────────────────────────
+
+  /admin/venues:
+    get:
+      operationId: adminListVenues
+      tags: [admin]
+      summary: Список площадок
+      description: Используется в форме создания сеанса для выбора площадки.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: city_slug
+          in: query
+          description: Фильтр по slug города
+          schema:
+            type: string
+            example: moskva
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Список площадок
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Venue'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: adminCreateVenue
+      tags: [admin]
+      summary: Создание площадки и схемы зала (US-19)
+      description: |
+        Создаёт площадку с прямоугольной сеткой мест.
+        После создания сервер генерирует `rows_count × seats_per_row` записей в `seats`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVenueRequest'
+            example:
+              name: Большой театр
+              address: Театральная пл., 1
+              city_id: 1
+              rows_count: 20
+              seats_per_row: 30
+      responses:
+        '201':
+          description: Площадка создана
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Venue'
+              example:
+                data:
+                  id: d1e2f3a4-0000-0000-0000-000000000001
+                  name: Большой театр
+                  address: Театральная пл., 1
+                  city:
+                    id: 1
+                    name: Москва
+                    slug: moskva
+                  rows_count: 20
+                  seats_per_row: 30
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/venues/{id}:
+    patch:
+      operationId: adminUpdateVenue
+      tags: [admin]
+      summary: Редактирование площадки
+      description: |
+        Правятся только описательные поля — `name` и `address`. Так исправляют
+        опечатку в названии или уточняют адрес.
+
+        Геометрия зала (`rows_count`, `seats_per_row`) неизменяема. Изменить её
+        значит пересоздать строки в `seats`, на которые ссылаются `bookings`
+        с `ON DELETE RESTRICT`: у проданных билетов пропала бы привязка к
+        конкретному креслу, а история заказов стала бы нечитаемой (BR-08).
+        Зал с другой сеткой — это новая площадка, её заводят через `POST /admin/venues`.
+
+        Отдельной user story на редактирование площадки нет: US-19 покрывает
+        создание, US-22 — событие и сеансы. Endpoint существует как операционная
+        необходимость админки.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateVenueRequest'
+      responses:
+        '200':
+          description: Площадка обновлена
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Venue'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # ADMIN — EVENTS
+  # ─────────────────────────────────────────────────────────────
+
+  /admin/events:
+    post:
+      operationId: adminCreateEvent
+      tags: [admin]
+      summary: Создание события (US-20)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+            example:
+              title: Гамлет
+              description: Трагедия Шекспира в постановке Товстоногова.
+              category_id: 1
+              age_rating: 16+
+              poster_url: https://cdn.example.com/hamlet.jpg
+      responses:
+        '201':
+          description: Событие создано
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EventBase'
+              example:
+                data:
+                  id: b1c2d3e4-0000-0000-0000-000000000001
+                  title: Гамлет
+                  description: Трагедия Шекспира в постановке Товстоногова.
+                  category:
+                    id: 1
+                    code: theatre
+                    name: Театр
+                    slug: theatre
+                  age_rating: 16+
+                  poster_url: https://cdn.example.com/hamlet.jpg
+                  created_at: '2026-09-01T00:00:00Z'
+                  updated_at: '2026-09-01T00:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/events/{id}:
+    patch:
+      operationId: adminUpdateEvent
+      tags: [admin]
+      summary: Редактирование события (US-22)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Событие обновлено
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EventBase'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/events/{id}/sessions:
+    post:
+      operationId: adminCreateSession
+      tags: [admin]
+      summary: Добавление сеанса к событию (US-21)
+      description: |
+        Нельзя создать сеанс с `starts_at` в прошлом (BR-03).
+
+        `total_seats` в запросе не передаётся. Вместимость уже задана площадкой:
+        сервер вычисляет его как `rows_count × seats_per_row` и сохраняет снимком
+        на момент создания (db-schema §3.7). Иначе значение разошлось бы со схемой
+        зала — админ указал бы 300, а `GET /sessions/{id}/seats` вернул бы 600 мест,
+        и не существует способа объяснить, какие 300 из них в продаже.
+
+        `seats_left` при создании равен `total_seats`.
+
+        Площадка занята, если на неё уже есть сеанс в то же время
+        (`uq_sessions_venue_starts_at`) — в этом случае `409`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+            example:
+              venue_id: d1e2f3a4-0000-0000-0000-000000000001
+              starts_at: '2026-10-15T19:00:00Z'
+              price: '2000.00'
+      responses:
+        '201':
+          description: Сеанс создан
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Событие или площадка не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Ошибка валидации или дата в прошлом (BR-03)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                validation:
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Ошибка валидации
+                    details:
+                      - field: price
+                        message: Должна быть неотрицательной
+                pastDate:
+                  summary: Дата в прошлом (BR-03)
+                  value:
+                    code: SESSION_IN_PAST
+                    message: Нельзя создать сеанс с датой в прошлом
+        '409':
+          description: Площадка занята в это время (uq_sessions_venue_starts_at)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: VENUE_BUSY
+                message: На этой площадке уже есть сеанс в указанное время
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ─────────────────────────────────────────────────────────────
+  # ADMIN — SESSIONS
+  # ─────────────────────────────────────────────────────────────
+
+  /admin/sessions/{id}:
+    patch:
+      operationId: adminUpdateSession
+      tags: [admin]
+      summary: Редактирование сеанса (US-22)
+      description: |
+        Нельзя изменить `starts_at` на дату в прошлом (BR-03).
+
+        `total_seats` не редактируется — он производен от площадки (см.
+        `POST /admin/events/{id}/sessions`). Сменить `venue_id` можно только
+        пока по сеансу нет активных броней: вместе с площадкой меняется и набор
+        мест, а уже удерживаемые или проданные кресла принадлежат старому залу (BR-08).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSessionRequest'
+      responses:
+        '200':
+          description: Сеанс обновлён
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/sessions/{id}/cancel:
+    post:
+      operationId: adminCancelSession
+      tags: [admin]
+      summary: Отмена сеанса (US-23)
+      description: |
+        Переводит сеанс в статус `cancelled`.
+        Все заказы на этот сеанс переходят в `cancelled`, брони освобождаются (BR-06).
+        Покупатели увидят статус в личном кабинете.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPath'
+      responses:
+        '200':
+          description: Сеанс отменён
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Session'
+              example:
+                data:
+                  id: c1d2e3f4-0000-0000-0000-000000000001
+                  event_id: b1c2d3e4-0000-0000-0000-000000000001
+                  venue:
+                    id: d1e2f3a4-0000-0000-0000-000000000001
+                    name: Большой театр
+                    address: Театральная пл., 1
+                    city:
+                      id: 1
+                      name: Москва
+                      slug: moskva
+                    rows_count: 20
+                    seats_per_row: 30
+                  city:
+                    id: 1
+                    name: Москва
+                    slug: moskva
+                  starts_at: '2026-10-15T19:00:00Z'
+                  price: '2000.00'
+                  total_seats: 300
+                  seats_left: 0
+                  status: cancelled
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Сеанс уже отменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: SESSION_ALREADY_CANCELLED
+                message: Сеанс уже отменён
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+# ─────────────────────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UUIDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: a1b2c3d4-0000-0000-0000-000000000001
+
+  responses:
+    Unauthorized:
+      description: Токен отсутствует, недействителен или истёк
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            missing:
+              summary: Токен не передан или не разбирается
+              value:
+                code: UNAUTHORIZED
+                message: Требуется авторизация
+            expired:
+              summary: Срок жизни токена истёк — нужен повторный вход (US-09)
+              value:
+                code: TOKEN_EXPIRED
+                message: Срок действия сессии истёк. Войдите заново
+
+    Forbidden:
+      description: Нет прав на ресурс
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: FORBIDDEN
+            message: Недостаточно прав
+
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NOT_FOUND
+            message: Ресурс не найден
+
+    OrderNotFound:
+      description: |
+        Заказ не найден либо принадлежит другому пользователю. Оба случая дают
+        один и тот же ответ, чтобы по коду нельзя было установить существование
+        чужого заказа (BR-07).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NOT_FOUND
+            message: Заказ не найден
+
+    InternalError:
+      description: Непредвиденная ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INTERNAL_ERROR
+            message: Внутренняя ошибка сервера
+
+    ValidationError:
+      description: Ошибка валидации полей запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: VALIDATION_ERROR
+            message: Ошибка валидации
+            details:
+              - field: email
+                message: Некорректный формат email
+              - field: password
+                message: Минимум 8 символов
+
+  schemas:
+
+    # ── Primitives ──────────────────────────────────────────────
+
+    UUID:
+      type: string
+      format: uuid
+      example: a1b2c3d4-0000-0000-0000-000000000001
+
+    Timestamp:
+      type: string
+      format: date-time
+      example: '2026-09-11T10:00:00Z'
+
+    Money:
+      type: string
+      pattern: '^[0-9]+\.[0-9]{2}$'
+      description: Денежная сумма в виде строки с двумя знаками после точки
+      example: '2000.00'
+
+    Pagination:
+      type: object
+      required: [page, per_page, total, total_pages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 0
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: NOT_FOUND
+        message:
+          type: string
+          example: Ресурс не найден
+        details:
+          type: array
+          description: |
+            Уточнения к ошибке. Поле-адрес зависит от `code`:
+            `field` — при `VALIDATION_ERROR`, `seat_id` — при `SEAT_ALREADY_TAKEN`.
+            При прочих кодах `details` отсутствует.
+          items:
+            type: object
+            required: [message]
+            properties:
+              field:
+                type: string
+                description: Имя поля запроса (VALIDATION_ERROR)
+                example: email
+              seat_id:
+                $ref: '#/components/schemas/UUID'
+              message:
+                type: string
+                example: Некорректный формат email
+
+    # ── Auth ────────────────────────────────────────────────────
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 255
+          example: s3cr3tPass
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          example: s3cr3tPass
+
+    UserProfile:
+      type: object
+      required: [id, email, role, created_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        role:
+          type: string
+          enum: [visitor, admin]
+          example: visitor
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    AuthResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [token, expires_in, user]
+          properties:
+            token:
+              type: string
+              description: JWT Bearer-токен
+              example: eyJhbGciOiJIUzI1NiJ9...
+            expires_in:
+              type: integer
+              description: |
+                Срок жизни токена в секундах. В MVP — 7 суток. Refresh-токена нет:
+                по истечении срока endpoints отвечают 401 `TOKEN_EXPIRED`
+                и требуется повторный вход.
+              example: 604800
+            user:
+              $ref: '#/components/schemas/UserProfile'
+
+    # ── City ────────────────────────────────────────────────────
+
+    City:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          maxLength: 100
+          example: Москва
+        slug:
+          type: string
+          maxLength: 100
+          example: moskva
+
+    # ── Category ────────────────────────────────────────────────
+
+    Category:
+      type: object
+      required: [id, code, name, slug]
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          description: |
+            Стабильный идентификатор категории для логики приложения.
+            В БД хранится в верхнем регистре (`THEATRE`), в API отдаётся в нижнем.
+          enum: [concert, theatre, standup, festival]
+          example: theatre
+        name:
+          type: string
+          maxLength: 100
+          example: Театр
+        slug:
+          type: string
+          maxLength: 100
+          example: theatre
+
+    # ── Venue ───────────────────────────────────────────────────
+
+    Venue:
+      type: object
+      required: [id, name, address, city, rows_count, seats_per_row]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        name:
+          type: string
+          maxLength: 255
+          example: Большой театр
+        address:
+          type: string
+          maxLength: 500
+          example: Театральная пл., 1
+        city:
+          $ref: '#/components/schemas/City'
+        rows_count:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+        seats_per_row:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 30
+
+    CreateVenueRequest:
+      type: object
+      required: [name, address, city_id, rows_count, seats_per_row]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Большой театр
+        address:
+          type: string
+          maxLength: 500
+          example: Театральная пл., 1
+        city_id:
+          type: integer
+          description: ID города. В MVP единственный город — Москва (id=1).
+          example: 1
+        rows_count:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+        seats_per_row:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 30
+
+    UpdateVenueRequest:
+      type: object
+      description: |
+        Все поля опциональны — передавать только изменяемые.
+        Геометрия зала (`rows_count`, `seats_per_row`) и город не редактируются:
+        по ним уже сгенерированы места, на которые ссылаются брони (BR-08).
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        address:
+          type: string
+          maxLength: 500
+
+    # ── Event ───────────────────────────────────────────────────
+
+    EventBase:
+      type: object
+      description: Базовое представление события (без вычисляемых полей по сеансам)
+      required: [id, title, category, age_rating, created_at, updated_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+          maxLength: 255
+          example: Гамлет
+        description:
+          type: ['string', 'null']
+          example: Трагедия Шекспира в постановке Товстоногова.
+        category:
+          $ref: '#/components/schemas/Category'
+        age_rating:
+          type: string
+          enum: ['0+', '6+', '12+', '16+', '18+']
+          example: 16+
+        poster_url:
+          type: ['string', 'null']
+          maxLength: 500
+          example: https://cdn.example.com/hamlet.jpg
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    EventSummary:
+      type: object
+      description: |
+        Представление события для каталога и карточки. Дополняет `EventBase`
+        полями, вычисленными по активным сеансам события.
+
+        Все три поля обязательны: и каталог, и карточка отдают только события,
+        у которых есть хотя бы один активный сеанс (US-01, US-04), поэтому
+        ближайшая дата и минимальная цена всегда определены. Ответы, где сеансов
+        может не быть — создание и редактирование события администратором, —
+        используют `EventBase`.
+      allOf:
+        - $ref: '#/components/schemas/EventBase'
+        - type: object
+          required: [nearest_session_at, min_price, sessions_count]
+          properties:
+            nearest_session_at:
+              description: Время начала ближайшего активного сеанса
+              $ref: '#/components/schemas/Timestamp'
+            min_price:
+              description: Минимальная цена среди активных сеансов события
+              $ref: '#/components/schemas/Money'
+            sessions_count:
+              type: integer
+              minimum: 1
+              example: 5
+
+    EventDetail:
+      type: object
+      description: Полное представление события для карточки (включает вычисляемые поля если есть сеансы)
+      allOf:
+        - $ref: '#/components/schemas/EventSummary'
+
+    EventListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateEventRequest:
+      type: object
+      required: [title, category_id, age_rating]
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          example: Гамлет
+        description:
+          type: ['string', 'null']
+          example: Трагедия Шекспира в постановке Товстоногова.
+        category_id:
+          type: integer
+          example: 1
+        age_rating:
+          type: string
+          enum: ['0+', '6+', '12+', '16+', '18+']
+          example: 16+
+        poster_url:
+          type: ['string', 'null']
+          maxLength: 500
+          example: https://cdn.example.com/hamlet.jpg
+
+    UpdateEventRequest:
+      type: object
+      description: Все поля опциональны — передавать только изменяемые
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        description:
+          type: ['string', 'null']
+        category_id:
+          type: integer
+        age_rating:
+          type: string
+          enum: ['0+', '6+', '12+', '16+', '18+']
+        poster_url:
+          type: ['string', 'null']
+          maxLength: 500
+
+    # ── Session ─────────────────────────────────────────────────
+
+    Session:
+      type: object
+      required: [id, event_id, venue, city, starts_at, price, total_seats, seats_left, status]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        event_id:
+          $ref: '#/components/schemas/UUID'
+        venue:
+          $ref: '#/components/schemas/Venue'
+        city:
+          $ref: '#/components/schemas/City'
+        starts_at:
+          $ref: '#/components/schemas/Timestamp'
+        price:
+          $ref: '#/components/schemas/Money'
+        total_seats:
+          type: integer
+          minimum: 1
+          readOnly: true
+          description: Вместимость площадки на момент создания сеанса (снимок)
+          example: 300
+        seats_left:
+          type: integer
+          minimum: 0
+          example: 142
+        status:
+          type: string
+          enum: [active, cancelled, completed]
+          example: active
+
+    # ── Seat map ─────────────────────────────────────────────────
+
+    SeatInfo:
+      type: object
+      required: [id, seat_no, price_category, price, status, held_by_me]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        seat_no:
+          type: integer
+          minimum: 1
+          example: 12
+        price_category:
+          type: string
+          description: Ценовая категория места. В БД — в верхнем регистре.
+          enum: [stalls, balcony]
+          example: stalls
+        price:
+          $ref: '#/components/schemas/Money'
+        status:
+          type: string
+          description: |
+            Публичное состояние места: `free` — свободно, `held` — удерживается
+            чьей-то бронью, `paid` — продано. Истёкшие брони не учитываются,
+            такое место снова `free`.
+          enum: [free, held, paid]
+          example: free
+        held_by_me:
+          type: boolean
+          description: |
+            Место удерживается текущим пользователем. Всегда `false` для гостя
+            и для запроса без токена. Даёт третье состояние схемы зала из US-10
+            («выбрано мной») и переживает перезагрузку страницы: фронт находит
+            свои места и продолжает отсчёт по `expires_at` своего заказа (US-12).
+          default: false
+          example: false
+
+    SeatRow:
+      type: object
+      required: [row_no, seats]
+      properties:
+        row_no:
+          type: integer
+          minimum: 1
+          example: 5
+        seats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeatInfo'
+
+    SeatMap:
+      type: object
+      description: Схема зала с актуальным статусом каждого места
+      required: [session_id, status, price, rows]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/UUID'
+        status:
+          type: string
+          enum: [active, cancelled, completed]
+          example: active
+        price:
+          description: |
+            Базовая цена сеанса. Цена конкретного места — `price` внутри `SeatInfo`:
+            `base_price × seats.price_factor` (db-schema §3.5).
+          $ref: '#/components/schemas/Money'
+        rows:
+          type: array
+          description: Ряды от сцены, места в ряду слева направо
+          items:
+            $ref: '#/components/schemas/SeatRow'
+
+    CreateSessionRequest:
+      type: object
+      description: |
+        `total_seats` не передаётся: сервер берёт его как
+        `rows_count × seats_per_row` площадки и сохраняет снимком (db-schema §3.7).
+      required: [venue_id, starts_at, price]
+      properties:
+        venue_id:
+          $ref: '#/components/schemas/UUID'
+        starts_at:
+          $ref: '#/components/schemas/Timestamp'
+        price:
+          description: Базовая цена сеанса, умножается на price_factor места
+          $ref: '#/components/schemas/Money'
+
+    UpdateSessionRequest:
+      type: object
+      description: |
+        Все поля опциональны — передавать только изменяемые.
+        `total_seats` производен от площадки и не редактируется.
+      properties:
+        venue_id:
+          description: Смена площадки допустима, пока по сеансу нет активных броней
+          $ref: '#/components/schemas/UUID'
+        starts_at:
+          $ref: '#/components/schemas/Timestamp'
+        price:
+          $ref: '#/components/schemas/Money'
+
+    # ── Order ───────────────────────────────────────────────────
+
+    CreateOrderRequest:
+      type: object
+      required: [session_id, seat_ids]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/UUID'
+        seat_ids:
+          type: array
+          description: UUID мест, выбранных на схеме зала
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/UUID'
+
+    BookedSeat:
+      type: object
+      description: Место в составе заказа
+      required: [id, row_no, seat_no, price_category, price]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        row_no:
+          type: integer
+          minimum: 1
+          example: 5
+        seat_no:
+          type: integer
+          minimum: 1
+          example: 12
+        price_category:
+          type: string
+          description: Ценовая категория места. В БД — в верхнем регистре.
+          enum: [stalls, balcony]
+          example: stalls
+        price:
+          $ref: '#/components/schemas/Money'
+
+    OrderSessionRef:
+      type: object
+      description: Краткая информация о сеансе внутри брони
+      required: [id, event, venue, starts_at, price]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        event:
+          type: object
+          required: [id, title]
+          properties:
+            id:
+              $ref: '#/components/schemas/UUID'
+            title:
+              type: string
+              example: Гамлет
+            poster_url:
+              type: ['string', 'null']
+              example: https://cdn.example.com/hamlet.jpg
+        venue:
+          type: object
+          required: [name, address, city]
+          properties:
+            name:
+              type: string
+              example: Большой театр
+            address:
+              type: string
+              example: Театральная пл., 1
+            city:
+              $ref: '#/components/schemas/City'
+        starts_at:
+          $ref: '#/components/schemas/Timestamp'
+        price:
+          $ref: '#/components/schemas/Money'
+
+    OrderDetail:
+      type: object
+      required: [id, session, seats, total_price, status, expires_at, created_at, updated_at]
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        session:
+          $ref: '#/components/schemas/OrderSessionRef'
+        seats:
+          type: array
+          description: Забронированные места
+          items:
+            $ref: '#/components/schemas/BookedSeat'
+        total_price:
+          $ref: '#/components/schemas/Money'
+        status:
+          type: string
+          enum: [pending, paid, cancelled, failed]
+          example: pending
+        expires_at:
+          type: ['string', 'null']
+          format: date-time
+          description: Время истечения удержания мест. Заполнено только для статуса pending (BR-02).
+          example: '2026-10-01T10:15:00Z'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+
+    OrderListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderDetail'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
