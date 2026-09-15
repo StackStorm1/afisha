@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Новый пуш в ту же ветку отменяет предыдущий прогон: устаревший коммит
+# проверять незачем.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Токену прогона достаточно права читать код.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Линтер и тесты backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Файла .env в репозитории нет: он в .gitignore и хранит секреты.
+      - name: Создать .env из образца
+        working-directory: .
+        run: cp .env.example .env
+
+      # Тот же docker-compose.yml, что и локально: имя базы, пользователь,
+      # пароль и порт берутся из .env, в workflow не продублировано ни одно
+      # значение. --wait дожидается healthcheck, описанного в compose.
+      - name: Поднять Postgres
+        working-directory: .
+        run: docker compose up -d --wait db
+
+      # Полная версия, а не плавающий мажор: setup-uv не поддерживает тег v10,
+      # его подвижные мажорные теги обрываются на v7.
+      - uses: astral-sh/setup-uv@v10.1.0
+        with:
+          version: "0.9.16"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - run: uv sync --locked
+
+      - run: uv run ruff check .
+
+      - run: uv run ruff format --check .
+
+      # Команда слово в слово из README.
+      - run: uv run --env-file ../.env pytest -q
+
+  docker:
+    name: Сборка образа и смоук-тест
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Создать .env из образца
+        run: cp .env.example .env
+
+      # Проверяет то, чего не видят тесты: собираемость Dockerfile,
+      # согласованность docker-compose.yml и полноту .env.example.
+      # --wait сам по себе основная проверка: backend не станет healthy,
+      # пока его healthcheck не получит 200 от /health, а тот ходит в базу.
+      - name: Поднять весь стек
+        run: docker compose up -d --build --wait --wait-timeout 120
+
+      - name: Проверить, что ручка отвечает
+        run: curl -fsS http://localhost:8000/health
+
+      # Без этого шага красный прогон нечем разбирать: compose покажет только
+      # то, что контейнер не стал здоровым, а причина останется в его логах.
+      - name: Логи при падении
+        if: failure()
+        run: docker compose logs --no-color
+
