@@ -1,23 +1,21 @@
 from functools import lru_cache
-from pydantic import computed_field
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # База данных
-    postgres_user: str
-    postgres_password: str
-    postgres_db: str
-    postgres_host: str = "db"
-    postgres_port: int = 5432
+    """Настройки читаются только из переменных окружения.
 
-    @computed_field
-    @property
-    def db_url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
+    Файл .env лежит в корне репозитория и принадлежит docker-compose: он
+    подставляет из него значения и передаёт их сервисам. Наполнить окружение —
+    задача того, кто запускает приложение (compose, systemd, `uv run --env-file`),
+    а не самого приложения. Благодаря этому в контейнере и на хост-машине
+    конфигурация грузится одним и тем же путём, без расхождений.
+    """
+
+    # DSN целиком. Собирать его здесь из POSTGRES_* нельзя: POSTGRES_PORT задаёт
+    # порт публикации на хост, а внутри docker-сети порт всегда 5432.
+    database_url: str
 
     # JWT
     secret_key: str
@@ -28,11 +26,10 @@ class Settings(BaseSettings):
 
     backend_cors_origins: str = "http://localhost"
     environment: str = "local"
+    log_level: str = "info"
+    debug: bool = False
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-    )
+    model_config = SettingsConfigDict()
 
 
 @lru_cache
