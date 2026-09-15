@@ -1,8 +1,11 @@
-from sqlalchemy import String, SmallInteger, DateTime, ForeignKey, CheckConstraint, text
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
-from app.db.base import Base
 from uuid import UUID
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, SmallInteger, String, text
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
+
 
 class Event(Base):
     __tablename__ = 'events'

@@ -1,8 +1,10 @@
-from sqlalchemy import DateTime, Numeric, String, CheckConstraint, ForeignKey, text
-from sqlalchemy.orm import Mapped, mapped_column
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, text
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db.base import Base
 
 

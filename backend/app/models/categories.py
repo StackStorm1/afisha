@@ -1,6 +1,8 @@
-from sqlalchemy import SmallInteger, String, UniqueConstraint, CheckConstraint
+from sqlalchemy import CheckConstraint, SmallInteger, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db.base import Base
+
 
 class Category(Base):
     __tablename__ = 'categories'

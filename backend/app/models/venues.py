@@ -1,8 +1,18 @@
-from sqlalchemy import SmallInteger, String, DateTime, CheckConstraint, UniqueConstraint, text
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from uuid import UUID
+
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db.base import Base
+
 
 class Venue(Base):
     __tablename__ = 'venues'

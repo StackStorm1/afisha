@@ -1,9 +1,20 @@
-from sqlalchemy import DateTime, Numeric, String, CheckConstraint, ForeignKey, text, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
-from decimal import Decimal
 from datetime import datetime
-from app.db.base import Base
+from decimal import Decimal
 from uuid import UUID
+
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
+
 
 class Session(Base):
     __tablename__ = 'sessions'

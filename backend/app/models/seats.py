@@ -1,8 +1,19 @@
-from sqlalchemy import SmallInteger, String, Numeric, text, CheckConstraint, ForeignKey, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
-from app.db.base import Base
-from uuid import UUID
 from decimal import Decimal
+from uuid import UUID
+
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Numeric,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
+
 
 class Seat(Base):
     __tablename__ = 'seats'

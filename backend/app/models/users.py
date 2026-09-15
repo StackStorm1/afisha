@@ -1,9 +1,12 @@
-from sqlalchemy import String, DateTime, text, UniqueConstraint, CheckConstraint
-from sqlalchemy.dialects.postgresql import CITEXT
-from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from uuid import UUID
+
+from sqlalchemy import CheckConstraint, DateTime, String, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import CITEXT
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.db.base import Base
+
 
 class User(Base):
     __tablename__ = 'users'
