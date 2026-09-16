@@ -26,10 +26,8 @@ class Venue(Base):
 
     __table_args__ = (
         UniqueConstraint("city_id", "name", name="uq_venues_city_name"),
-        CheckConstraint("rows_count BETWEEN 1 AND 100", name="ck_venues_rows"),
-        CheckConstraint(
-            "seats_per_row BETWEEN 1 AND 100", name="ck_venues_seats_per_row"
-        ),
+        CheckConstraint("rows_count BETWEEN 1 AND 100", name="rows"),
+        CheckConstraint("seats_per_row BETWEEN 1 AND 100", name="seats_per_row"),
     )
 
     id: Mapped[UUID] = mapped_column(

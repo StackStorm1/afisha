@@ -25,14 +25,12 @@ class Seat(Base):
     __tablename__ = "seats"
 
     __table_args__ = (
-        CheckConstraint("row_no > 0", name="ck_seats_row_no"),
-        CheckConstraint("seat_no > 0", name="ck_seats_seat_no"),
+        CheckConstraint("row_no > 0", name="row_no"),
+        CheckConstraint("seat_no > 0", name="seat_no"),
         CheckConstraint(
-            "price_category IN ('STALLS', 'BALCONY')", name="ck_seats_price_category"
+            "price_category IN ('STALLS', 'BALCONY')", name="price_category"
         ),
-        CheckConstraint(
-            "price_factor BETWEEN 0.10 AND 10.00", name="ck_seats_price_factor"
-        ),
+        CheckConstraint("price_factor BETWEEN 0.10 AND 10.00", name="price_factor"),
         UniqueConstraint(
             "venue_id", "row_no", "seat_no", name="uq_seats_venue_row_seat"
         ),

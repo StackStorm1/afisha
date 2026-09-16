@@ -19,14 +19,12 @@ class Order(Base):
     __tablename__ = "orders"
 
     __table_args__ = (
-        CheckConstraint("total_price >= 0", name="ck_orders_total_price"),
+        CheckConstraint("total_price >= 0", name="total_price"),
         CheckConstraint(
             "status IN ('PENDING', 'PAID', 'FAILED', 'CANCELLED')",
-            name="ck_orders_status",
+            name="status",
         ),
-        CheckConstraint(
-            "(status = 'PAID') = (paid_at IS NOT NULL)", name="ck_orders_paid_at"
-        ),
+        CheckConstraint("(status = 'PAID') = (paid_at IS NOT NULL)", name="paid_at"),
     )
 
     id: Mapped[UUID] = mapped_column(

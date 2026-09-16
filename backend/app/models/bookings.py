@@ -28,14 +28,14 @@ class Booking(Base):
     __tablename__ = "bookings"
 
     __table_args__ = (
-        CheckConstraint("price >= 0", name="ck_bookings_price"),
+        CheckConstraint("price >= 0", name="price"),
         CheckConstraint(
             "status IN ('HELD', 'PAID', 'EXPIRED', 'CANCELLED')",
-            name="ck_bookings_status",
+            name="status",
         ),
         CheckConstraint(
             "(status = 'HELD') = (expires_at IS NOT NULL)",
-            name="ck_bookings_expires_at",
+            name="expires_at",
         ),
         Index(
             "uq_bookings_active_seat",

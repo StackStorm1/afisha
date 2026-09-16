@@ -30,14 +30,14 @@ class Session(Base):
     __tablename__ = "sessions"
 
     __table_args__ = (
-        CheckConstraint("base_price >= 0", name="ck_sessions_base_price"),
-        CheckConstraint("seats_total > 0", name="ck_sessions_seats_total"),
+        CheckConstraint("base_price >= 0", name="base_price"),
+        CheckConstraint("seats_total > 0", name="seats_total"),
         CheckConstraint(
             "seats_available BETWEEN 0 and seats_total",
-            name="ck_sessions_seats_available",
+            name="seats_available",
         ),
         CheckConstraint(
-            "status IN ('ACTIVE', 'CANCELLED', 'COMPLETED')", name="ck_sessions_status"
+            "status IN ('ACTIVE', 'CANCELLED', 'COMPLETED')", name="status"
         ),
         UniqueConstraint("venue_id", "starts_at", name="uq_sessions_venue_starts_at"),
     )
