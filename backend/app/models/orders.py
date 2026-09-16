@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, text
@@ -7,6 +8,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.enums import OrderStatus
+
+if TYPE_CHECKING:
+    from app.models.bookings import Booking
+    from app.models.sessions import Session
+    from app.models.users import User
 
 
 class Order(Base):

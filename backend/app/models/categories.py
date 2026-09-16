@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import CheckConstraint, SmallInteger, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.enums import CategoryCode
+
+if TYPE_CHECKING:
+    from app.models.events import Event
 
 
 class Category(Base):

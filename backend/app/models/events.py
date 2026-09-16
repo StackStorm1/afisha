@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, SmallInteger, String, text
@@ -6,6 +7,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.enums import AgeRating
+
+if TYPE_CHECKING:
+    from app.models.categories import Category
+    from app.models.favorites import Favorite
+    from app.models.sessions import Session
 
 
 class Event(Base):

@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
@@ -15,6 +16,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.enums import BookingStatus
+
+if TYPE_CHECKING:
+    from app.models.orders import Order
+    from app.models.seats import Seat
+    from app.models.sessions import Session
+    from app.models.users import User
 
 
 class Booking(Base):
@@ -61,7 +68,9 @@ class Booking(Base):
         DateTime(timezone=True), server_default=text("now()")
     )
 
-    session: Mapped["Session"] = relationship(back_populates="bookings", lazy="raise")
+    session: Mapped["Session"] = relationship(
+        "Session", back_populates="bookings", lazy="raise"
+    )
     seat: Mapped["Seat"] = relationship(back_populates="bookings", lazy="raise")
     user: Mapped["User"] = relationship(back_populates="bookings", lazy="raise")
     order: Mapped["Order | None"] = relationship(

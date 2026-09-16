@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
@@ -14,6 +15,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.enums import PriceCategory
+
+if TYPE_CHECKING:
+    from app.models.bookings import Booking
+    from app.models.venues import Venue
 
 
 class Seat(Base):
