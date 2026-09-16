@@ -2,13 +2,15 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, SmallInteger, String, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.enums import AgeRating
 
 
 class Event(Base):
     __tablename__ = "events"
+
     __table_args__ = (
         CheckConstraint("length(btrim(title)) > 0", name="ck_events_title_not_blank"),
         CheckConstraint(
@@ -16,6 +18,7 @@ class Event(Base):
             name="ck_events_age_rating",
         ),
     )
+
     id: Mapped[UUID] = mapped_column(
         primary_key=True, server_default=text("gen_random_uuid()")
     )
@@ -25,11 +28,19 @@ class Event(Base):
         SmallInteger,
         ForeignKey("categories.id", name="fk_events_category", ondelete="RESTRICT"),
     )
-    age_rating: Mapped[str] = mapped_column(String(3))
+    age_rating: Mapped[AgeRating] = mapped_column(String(3))
     poster_url: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
+    )
+
+    category: Mapped["Category"] = relationship(back_populates="events", lazy="raise")
+    sessions: Mapped[list["Session"]] = relationship(
+        back_populates="event", lazy="raise"
+    )
+    favorites: Mapped[list["Favorite"]] = relationship(
+        back_populates="event", lazy="raise"
     )

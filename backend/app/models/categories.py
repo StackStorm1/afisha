@@ -1,7 +1,8 @@
 from sqlalchemy import CheckConstraint, SmallInteger, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.enums import CategoryCode
 
 
 class Category(Base):
@@ -16,9 +17,14 @@ class Category(Base):
             name="ck_categories_code",
         ),
     )
+
     id: Mapped[int] = mapped_column(
         SmallInteger(), primary_key=True, autoincrement=True
     )
-    code: Mapped[str] = mapped_column(String(20))
+    code: Mapped[CategoryCode] = mapped_column(String(20))
     name: Mapped[str] = mapped_column(String(100))
     slug: Mapped[str] = mapped_column(String(100))
+
+    events: Mapped[list["Event"]] = relationship(
+        back_populates="category", lazy="raise"
+    )

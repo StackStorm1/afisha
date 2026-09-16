@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import DateTime, ForeignKey, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -21,3 +21,6 @@ class Favorite(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
+
+    user: Mapped["User"] = relationship(back_populates="favorites", lazy="raise")
+    event: Mapped["Event"] = relationship(back_populates="favorites", lazy="raise")

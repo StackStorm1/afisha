@@ -3,9 +3,10 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.enums import OrderStatus
 
 
 class Order(Base):
@@ -32,11 +33,19 @@ class Order(Base):
         ForeignKey("sessions.id", name="fk_orders_session", ondelete="RESTRICT")
     )
     total_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    status: Mapped[str] = mapped_column(String(20), server_default=text("'PENDING'"))
+    status: Mapped[OrderStatus] = mapped_column(
+        String(20), server_default=text(f"'{OrderStatus.PENDING}'")
+    )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
+    )
+
+    user: Mapped["User"] = relationship(back_populates="orders", lazy="raise")
+    session: Mapped["Session"] = relationship(back_populates="orders", lazy="raise")
+    bookings: Mapped[list["Booking"]] = relationship(
+        back_populates="order", lazy="raise"
     )

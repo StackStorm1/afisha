@@ -2,10 +2,19 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.enums import BookingStatus
 
 
 class Booking(Base):
@@ -20,6 +29,13 @@ class Booking(Base):
         CheckConstraint(
             "(status = 'HELD') = (expires_at IS NOT NULL)",
             name="ck_bookings_expires_at",
+        ),
+        Index(
+            "uq_bookings_active_seat",
+            "session_id",
+            "seat_id",
+            unique=True,
+            postgresql_where=text("status IN ('HELD', 'PAID')"),
         ),
     )
 
@@ -39,8 +55,15 @@ class Booking(Base):
         ForeignKey("orders.id", name="fk_bookings_order", ondelete="RESTRICT")
     )
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    status: Mapped[str] = mapped_column(String(20))
+    status: Mapped[BookingStatus] = mapped_column(String(20))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
+    )
+
+    session: Mapped["Session"] = relationship(back_populates="bookings", lazy="raise")
+    seat: Mapped["Seat"] = relationship(back_populates="bookings", lazy="raise")
+    user: Mapped["User"] = relationship(back_populates="bookings", lazy="raise")
+    order: Mapped["Order | None"] = relationship(
+        back_populates="bookings", lazy="raise"
     )
