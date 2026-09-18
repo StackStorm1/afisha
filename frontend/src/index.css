@@ -50,10 +50,14 @@
   box-sizing: border-box;
 }
 
+/* min-height, не height: с фиксированной height:100% контейнер #root
+   обрезается по высоте вьюпорта в качестве containing block для
+   position:sticky — sticky-шапка отрывалась от верха после ~700px
+   прокрутки на любой странице длиннее экрана. */
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {

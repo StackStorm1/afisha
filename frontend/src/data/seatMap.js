@@ -9,6 +9,13 @@ const BALCONY_SHARE = 0.3;
 const BALCONY_FACTOR = 0.6;
 const STALLS_FACTOR = 1;
 
+// Первый ряд балкона в зале на rowsCount рядов — общая с buildSeatMap
+// формула, чтобы текстовое описание зала (страница события) не разошлось
+// со схемой зала.
+export function getBalconyStartRow(rowsCount) {
+  return Math.ceil(rowsCount * (1 - BALCONY_SHARE)) + 1;
+}
+
 function hashSeed(text) {
   let hash = 0;
   for (let i = 0; i < text.length; i += 1) {
@@ -22,7 +29,7 @@ const seatMapCache = new Map();
 function buildSeatMap(session) {
   const { venue } = session;
   const random = createSeededRandom(hashSeed(session.id));
-  const balconyStartRow = Math.ceil(venue.rows_count * (1 - BALCONY_SHARE)) + 1;
+  const balconyStartRow = getBalconyStartRow(venue.rows_count);
 
   const takenCount = session.total_seats - session.seats_left;
   const seatIndexes = Array.from({ length: session.total_seats }, (_, i) => i);
