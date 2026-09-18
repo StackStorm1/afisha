@@ -19,8 +19,8 @@ const TIME_OPTIONS = [
 
 const AGE_OPTIONS = [6, 12, 16, 18];
 
-// Шапка отражает состояние авторизации — до готовности T-10/T-11 (Group A)
-// принимает его снаружи, по умолчанию вид гостя (TASKS.md T-01).
+// Состояние авторизации приходит снаружи — стора авторизации ещё нет,
+// по умолчанию вид гостя.
 export default function Header({ authorized = false }) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -45,8 +45,8 @@ export default function Header({ authorized = false }) {
 
   function pickSuggestion(item) {
     setSearchOpen(false);
+    setQuery('');
     if (item.type === 'venue') {
-      setQuery('');
       toggleVenue(item.id);
       navigate('/');
     } else {

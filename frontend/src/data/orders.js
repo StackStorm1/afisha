@@ -43,10 +43,24 @@ class OrderError extends Error {
   }
 }
 
+// Возвращает места заказа в 'free' в кэше схемы зала — без этого отменённая
+// или истёкшая бронь держит места занятыми до конца жизни вкладки (BR-02
+// требует именно освобождения, не просто смены статуса заказа).
+function releaseSeats(order) {
+  const seatMap = getSeatMap(order.session.id);
+  if (!seatMap) return;
+  for (const bookedSeat of order.seats) {
+    for (const row of seatMap.rows) {
+      const seat = row.seats.find((s) => s.id === bookedSeat.id);
+      if (seat) seat.status = 'free';
+    }
+  }
+}
+
 // Мок POST /orders (US-11, BR-01, BR-02): держит места 15 минут, статус
 // заказа сразу pending. Бросает OrderError с кодом SEAT_ALREADY_TAKEN, если
 // среди seatIds есть уже занятое — форма ошибки повторяет Error/details из
-// openapi.yaml, чтобы обработчик на T-18 мог отличить конфликт от прочего.
+// openapi.yaml, чтобы обработчик конфликта мог отличить его от прочих ошибок.
 export function createOrder({ sessionId, seatIds }) {
   const session = getSession(sessionId);
   if (!session) throw new OrderError('NOT_FOUND', 'Сеанс не найден');
@@ -97,7 +111,7 @@ export function createOrder({ sessionId, seatIds }) {
 
 // Мок POST /orders/{id}/pay (US-14, US-16, BR-05). `outcome` эмулирует
 // PaymentGateway из requirements.md — управляемый исход, а не случайность,
-// чтобы можно было детерминированно проверить оба сценария на T-19/T-20.
+// чтобы можно было детерминированно проверить оба сценария (успех/отказ).
 export function payOrder(orderId, { outcome = 'success' } = {}) {
   const order = ordersById.get(orderId);
   if (!order) throw new OrderError('ORDER_NOT_FOUND', 'Заказ не найден');
@@ -113,6 +127,8 @@ export function payOrder(orderId, { outcome = 'success' } = {}) {
   // openapi.yaml описание POST /orders/{id}/pay).
   if (new Date(order.expires_at) < new Date()) {
     order.status = 'cancelled';
+    order.updated_at = isoNow();
+    releaseSeats(order);
     throw new OrderError(
       'BOOKING_EXPIRED',
       'Срок удержания мест истёк. Выберите места заново'
@@ -147,8 +163,18 @@ export function payOrder(orderId, { outcome = 'success' } = {}) {
 export function cancelOrder(orderId) {
   const order = ordersById.get(orderId);
   if (!order) throw new OrderError('ORDER_NOT_FOUND', 'Заказ не найден');
+  if (order.status === 'cancelled') {
+    throw new OrderError('ORDER_NOT_CANCELLABLE', 'Заказ уже отменён');
+  }
+  if (new Date(order.session.starts_at) <= new Date()) {
+    throw new OrderError(
+      'SESSION_ALREADY_STARTED',
+      'Сеанс уже начался, отменить заказ нельзя'
+    );
+  }
   order.status = 'cancelled';
   order.updated_at = isoNow();
+  releaseSeats(order);
   return order;
 }
 

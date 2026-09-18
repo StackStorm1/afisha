@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { listEvents, listEventSessions } from './events.js';
 import { getSeatMap } from './seatMap.js';
 import { createOrder, payOrder, cancelOrder, listMyOrders, getOrder } from './orders.js';
@@ -9,6 +9,7 @@ function freeSession() {
   for (const event of events) {
     for (const session of listEventSessions(event.id)) {
       if (session.status !== 'active') continue;
+      if (new Date(session.starts_at) <= new Date()) continue;
       const seatMap = getSeatMap(session.id);
       const freeSeats = seatMap.rows
         .flatMap((row) => row.seats)
@@ -89,6 +90,33 @@ describe('orders mock — POST /orders/{id}/pay (US-14, US-16, BR-05)', () => {
     expect(retried.status).toBe('paid');
     expect(retried.seats).toEqual(order.seats);
   });
+
+  it('истечение удержания освобождает места (BR-02)', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(order.expires_at).getTime() + 1000);
+    expect.assertions(3);
+    try {
+      payOrder(order.id, { outcome: 'success' });
+    } catch (error) {
+      expect(error.code).toBe('BOOKING_EXPIRED');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(getOrder(order.id).status).toBe('cancelled');
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('orders mock — отмена и список заказов (US-15, US-17)', () => {
@@ -97,6 +125,34 @@ describe('orders mock — отмена и список заказов (US-15, US
     const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
     const cancelled = cancelOrder(order.id);
     expect(cancelled.status).toBe('cancelled');
+  });
+
+  it('cancelOrder освобождает места — их снова можно забронировать (BR-02)', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+    cancelOrder(order.id);
+
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+
+    const rebooked = createOrder({ sessionId: session.id, seatIds: [seatId] });
+    expect(rebooked.seats[0].id).toBe(seatId);
+  });
+
+  it('повторная отмена уже отменённого заказа — ORDER_NOT_CANCELLABLE', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    cancelOrder(order.id);
+
+    expect.assertions(1);
+    try {
+      cancelOrder(order.id);
+    } catch (error) {
+      expect(error.code).toBe('ORDER_NOT_CANCELLABLE');
+    }
   });
 
   it('listMyOrders отдаёт OrderListResponse и фильтрует по статусу', () => {

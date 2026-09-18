@@ -17,7 +17,8 @@ import {
 } from '../lib/format.js';
 import styles from './EventPage.module.css';
 
-// Тумблер авторизации — до готовности T-10/T-11 (Group A), см. Header.jsx.
+// Состояние авторизации приходит снаружи — стора авторизации ещё нет,
+// см. Header.jsx.
 const AUTHORIZED = false;
 const DESCRIPTION_CLAMP_THRESHOLD = 180;
 

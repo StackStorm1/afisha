@@ -4,7 +4,7 @@ import { useFiltersStore } from '../store/useFiltersStore.js';
 import styles from './EmptyState.module.css';
 
 // «Не нашли X, вот что есть в выходные» + альтернативы вместо пустого
-// экрана — блюпринт §26, ARCHITECTURE.md §3.
+// экрана.
 export default function EmptyState({ activeFiltersLabel, alternatives }) {
   const resetAll = useFiltersStore((s) => s.resetAll);
 

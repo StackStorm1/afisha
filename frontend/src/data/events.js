@@ -43,7 +43,7 @@ function buildSessionsForEvent(eventId) {
     startsAt.setUTCHours(randomInt(random, 11, 22), pick(random, [0, 30]), 0, 0);
 
     // Один из сеансов события — отменённый, если событие не полностью
-    // распродано (ARCHITECTURE.md §4: отменённый сеанс виден, задизейблен).
+    // распродано (отменённый сеанс должен быть виден и задизейблен, не скрыт).
     const isCancelled = !soldOutEvent && i === 0 && random() < 0.1;
 
     sessions.push(
@@ -82,6 +82,9 @@ function summarize(event, sessions) {
 function buildCatalog() {
   const events = [];
   const sessionsByEvent = new Map();
+  const eventById = new Map();
+  const eventIdBySessionId = new Map();
+  const sessionById = new Map();
 
   for (const category of CATEGORIES) {
     const titles = TITLES_BY_CATEGORY[category.code];
@@ -97,8 +100,8 @@ function buildCatalog() {
         age_rating: pick(random, AGE_RATINGS),
         poster_url: null,
         // duration_minutes/has_intermission — нет в openapi.yaml (EventBase),
-        // только для карточки страницы события: длительность там нужна
-        // (Событие.dc.html), а контракт её пока не описывает.
+        // только для карточки страницы события: длительность там нужна,
+        // а контракт её пока не описывает.
         duration_minutes: randomInt(random, 50, 170),
         has_intermission: random() < 0.4,
         created_at: new Date(Date.now() - randomInt(random, 30, 200) * DAY_MS)
@@ -111,16 +114,29 @@ function buildCatalog() {
 
       const sessions = buildSessionsForEvent(id);
       sessionsByEvent.set(id, sessions);
+      for (const session of sessions) {
+        eventIdBySessionId.set(session.id, id);
+        sessionById.set(session.id, session);
+      }
 
       const summary = summarize(event, sessions);
-      if (summary) events.push(summary);
+      if (summary) {
+        events.push(summary);
+        eventById.set(id, summary);
+      }
     }
   }
 
-  return { events, sessionsByEvent };
+  return { events, sessionsByEvent, eventById, eventIdBySessionId, sessionById };
 }
 
-const { events: ALL_EVENTS, sessionsByEvent: SESSIONS_BY_EVENT } = buildCatalog();
+const {
+  events: ALL_EVENTS,
+  sessionsByEvent: SESSIONS_BY_EVENT,
+  eventById: EVENT_BY_ID,
+  eventIdBySessionId: EVENT_ID_BY_SESSION_ID,
+  sessionById: SESSION_BY_ID,
+} = buildCatalog();
 
 function hasSessionInRange(eventId, date_from, date_to) {
   if (!date_from && !date_to) return true;
@@ -138,8 +154,10 @@ function matchesFilters(event, { category, date_from, date_to, q } = {}) {
   if (category && event.category.slug !== category) return false;
   if (!hasSessionInRange(event.id, date_from, date_to)) return false;
   if (q) {
+    // US-02/openapi.yaml: полнотекстовый поиск по названию И описанию.
     const needle = q.trim().toLowerCase();
-    if (!event.title.toLowerCase().includes(needle)) return false;
+    const haystack = `${event.title} ${event.description ?? ''}`.toLowerCase();
+    if (!haystack.includes(needle)) return false;
   }
   return true;
 }
@@ -176,7 +194,7 @@ export function listEvents({
 // Мок GET /events/{id} — форма ответа: { data: EventDetail }. EventDetail в
 // контракте — тот же набор полей, что EventSummary (allOf без добавлений).
 export function getEvent(id) {
-  return ALL_EVENTS.find((event) => event.id === id) ?? null;
+  return EVENT_BY_ID.get(id) ?? null;
 }
 
 // Мок GET /events/{id}/sessions — форма ответа: { data: Session[] }.
@@ -186,16 +204,10 @@ export function listEventSessions(eventId) {
 
 // Мок GET /sessions/{id} — форма ответа: { data: Session }.
 export function getSession(sessionId) {
-  for (const sessions of SESSIONS_BY_EVENT.values()) {
-    const found = sessions.find((s) => s.id === sessionId);
-    if (found) return found;
-  }
-  return null;
+  return SESSION_BY_ID.get(sessionId) ?? null;
 }
 
 export function getEventBySessionId(sessionId) {
-  for (const [eventId, sessions] of SESSIONS_BY_EVENT.entries()) {
-    if (sessions.some((s) => s.id === sessionId)) return getEvent(eventId);
-  }
-  return null;
+  const eventId = EVENT_ID_BY_SESSION_ID.get(sessionId);
+  return eventId ? getEvent(eventId) : null;
 }

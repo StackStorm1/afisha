@@ -27,7 +27,7 @@
   --color-status-warning: #f0b060;
   --color-status-error: #ff8fa4;
 
-  /* Радиусы — два слоя, см. DESIGN-SYSTEM.md */
+  /* Радиусы — два слоя: афишный (постеры, пилюли) и служебный (поля, кнопки) */
   --radius-poster: 18px;
   --radius-pill: 999px;
   --radius-control: 8px;

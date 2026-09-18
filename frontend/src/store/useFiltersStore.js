@@ -2,7 +2,6 @@ import { create } from 'zustand';
 
 const INITIAL = {
   q: '',
-  searchOpen: false,
   time: null, // 'today' | 'tomorrow' | 'weekend' | 'week' | 'custom' | null
   day: null, // конкретная дата (YYYY-MM-DD), выбранная в 14-дневной ленте
   priceUnder1500: false,
@@ -15,14 +14,13 @@ const INITIAL = {
 export const useFiltersStore = create((set, get) => ({
   ...INITIAL,
 
-  setQuery: (q) => set({ q, searchOpen: true }),
-  setSearchOpen: (searchOpen) => set({ searchOpen }),
+  setQuery: (q) => set({ q }),
 
   toggleTime: (time) =>
-    set((state) => ({
-      time: state.time === time ? null : time,
-      day: time === 'custom' ? state.day : null,
-    })),
+    set((state) => {
+      const nextTime = state.time === time ? null : time;
+      return { time: nextTime, day: nextTime === 'custom' ? state.day : null };
+    }),
 
   setDay: (day) =>
     set((state) => ({

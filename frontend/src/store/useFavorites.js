@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 // US-18 (Could-have): пока только переключение сердечка на карточке,
 // синхронное между всеми карточками одного события. Отдельная страница
-// /favorites и персистентность — TASKS.md группа A.
+// /favorites и персистентность между сессиями — позже.
 export const useFavorites = create((set, get) => ({
   ids: new Set(),
   isFavorite: (eventId) => get().ids.has(eventId),
