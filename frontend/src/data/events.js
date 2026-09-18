@@ -39,7 +39,7 @@ function buildSessionsForEvent(eventId) {
 
   const sessions = [];
   for (let i = 0; i < sessionsCount; i += 1) {
-    const startsAt = new Date(Date.now() + randomInt(random, 1, 45) * DAY_MS);
+    const startsAt = new Date(Date.now() + randomInt(random, 0, 45) * DAY_MS);
     startsAt.setUTCHours(randomInt(random, 11, 22), pick(random, [0, 30]), 0, 0);
 
     // Один из сеансов события — отменённый, если событие не полностью
@@ -96,6 +96,11 @@ function buildCatalog() {
         category,
         age_rating: pick(random, AGE_RATINGS),
         poster_url: null,
+        // duration_minutes/has_intermission — нет в openapi.yaml (EventBase),
+        // только для карточки страницы события: длительность там нужна
+        // (Событие.dc.html), а контракт её пока не описывает.
+        duration_minutes: randomInt(random, 50, 170),
+        has_intermission: random() < 0.4,
         created_at: new Date(Date.now() - randomInt(random, 30, 200) * DAY_MS)
           .toISOString()
           .replace(/\.\d{3}Z$/, 'Z'),

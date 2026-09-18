@@ -10,6 +10,10 @@ describe('App', () => {
         <App />
       </BrowserRouter>
     );
-    expect(screen.getByRole('heading', { name: 'Stack Afisha' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Stack Afisha' })).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText('Поиск по названию или площадке')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Подборки' })).toBeInTheDocument();
   });
 });
