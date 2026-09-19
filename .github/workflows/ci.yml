@@ -3,7 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
+  # Push-триггер ограничен main: иначе коммит в ветку с открытым PR
+  # проверялся бы дважды — и как push, и как pull_request.
   pull_request:
+  # Ручной запуск из вкладки Actions: перепроверить main, не делая пустой коммит.
+  workflow_dispatch:
 
 # Новый пуш в ту же ветку отменяет предыдущий прогон: устаревший коммит
 # проверять незачем.
@@ -15,28 +19,19 @@ concurrency:
 permissions:
   contents: read
 
+# Три задачи независимы и идут параллельно: видно все падения сразу,
+# а не только первое.
 jobs:
   backend:
     name: Линтер и тесты backend
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
 
     steps:
       - uses: actions/checkout@v7
-
-      # Файла .env в репозитории нет: он в .gitignore и хранит секреты.
-      - name: Создать .env из образца
-        working-directory: .
-        run: cp .env.example .env
-
-      # Тот же docker-compose.yml, что и локально: имя базы, пользователь,
-      # пароль и порт берутся из .env, в workflow не продублировано ни одно
-      # значение. --wait дожидается healthcheck, описанного в compose.
-      - name: Поднять Postgres
-        working-directory: .
-        run: docker compose up -d --wait db
 
       # Полная версия, а не плавающий мажор: setup-uv не поддерживает тег v10,
       # его подвижные мажорные теги обрываются на v7.
@@ -52,12 +47,26 @@ jobs:
 
       - run: uv run ruff format --check .
 
+      # Файла .env в репозитории нет: он в .gitignore и хранит секреты.
+      - name: Создать .env из образца
+        working-directory: .
+        run: cp .env.example .env
+
+      # Тот же docker-compose.yml, что и локально: имя базы, пользователь,
+      # пароль и порт берутся из .env, в workflow не продублировано ни одно
+      # значение. --wait дожидается healthcheck, описанного в compose.
+      # Шаг стоит после линтера: падение ruff не должно ждать старта Postgres.
+      - name: Поднять Postgres
+        working-directory: .
+        run: docker compose up -d --wait db
+
       # Команда слово в слово из README.
       - run: uv run --env-file ../.env pytest -q
 
   frontend:
     name: Линтер и тесты frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
@@ -65,20 +74,29 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      # cache: npm кэширует ~/.npm, ключ считается по package-lock.json.
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # ci, а не install: ставит ровно версии из package-lock.json и падает,
+      # если lock разошёлся с package.json. Установка в CI не должна молча
+      # обновлять зависимости.
       - run: npm ci
 
+      # Порядок от дешёвого к дорогому: линтер отсекает ошибку за секунды.
       - run: npm run lint
 
       - run: npm run format:check
 
+      # vitest run — один прогон без watch. jsdom и setupFiles заданы
+      # в vite.config.js, поэтому в workflow их дублировать не нужно.
       - run: npm test
 
+      # Сборка проверяет то, чего не видят тесты: что production-бандл
+      # вообще собирается. Артефакт не сохраняем — его никто не потребляет.
       - run: npm run build
 
   docker:
