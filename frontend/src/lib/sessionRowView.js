@@ -26,9 +26,8 @@ export function buildSessionRowView(session, { authorized }) {
   const minAvailable = sold ? null : Math.min(...availableZones.map((z) => z.price));
   const many = zones.length > 1;
 
-  // Распроданную категорию находим по остатку (available === 0), не по
-  // цене — балкон почти всегда дешевле партера, и сравнение цен ошибочно
-  // считало распроданным именно балкон вместо реально закончившегося партера.
+  // Распроданная категория — та, у которой available === 0. Не самая
+  // дешёвая и не самая дорогая: цена про остаток мест ничего не говорит.
   let zonesLabel;
   if (sold) {
     zonesLabel = `${zones.map((z) => ZONE_LABELS[z.category]).join(' · ')} — мест нет`;

@@ -10,8 +10,8 @@ function normalize(text) {
 }
 
 // Zero-state (пустой запрос) — «Популярно сегодня», иначе — группы
-// «Площадки»/«События» по substring-совпадению (блюпринт §5, в границах
-// requirements.md: без NLP-разбора, US-07 Could-have).
+// «Площадки»/«События» по substring-совпадению. Без разбора смысла запроса:
+// US-07 в requirements.md помечен как Could-have и в MVP не делается.
 export function useSearchSuggestions(query) {
   return useMemo(() => {
     const { data: events } = listEvents({ per_page: 500 });

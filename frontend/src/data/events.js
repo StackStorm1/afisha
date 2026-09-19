@@ -33,8 +33,8 @@ function buildSessionsForEvent(eventId) {
   const venue = pick(random, VENUES);
   const seatsTotal = venue.rows_count * venue.seats_per_row;
 
-  // ~15% событий полностью распроданы — честная проверка бейджа «Продано»
-  // (requirements.md, US-01: минимальная ДОСТУПНАЯ цена, не историческая).
+  // ~15% событий полностью распроданы: иначе бейдж «Продано» и связанные
+  // с ним состояния карточки в моках просто не встречаются.
   const soldOutEvent = random() < 0.15;
 
   const sessions = [];

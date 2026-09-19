@@ -14,7 +14,10 @@ const MONTHS = [
   'дек',
 ];
 
-// "2 900 ₽" — неразрывные пробелы между тройками разрядов.
+// "2 900 ₽" — разряды разделены обычным пробелом (U+0020), поэтому цена
+// может разорваться переносом строки. Неразрывный U+00A0 записывается тут
+// только escape-последовательностью: буквальный символ отклоняет eslint
+// правилом no-irregular-whitespace.
 export function formatPrice(amount) {
   const rounded = Math.round(Number(amount));
   return `${String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`;

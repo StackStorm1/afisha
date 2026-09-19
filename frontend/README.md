@@ -1,9 +1,8 @@
 # Afisha — frontend
 
 React 18 + Vite, `react-router-dom`, `zustand`, `@tanstack/react-query`, CSS
-Modules. Общая архитектура, макеты и бэклог — в `afisha-frontend-docs/`
-(README.md там указывает, что читать дальше) и в `docs/` в корне репозитория
-(`requirements.md`, `db-schema.md`, `api/openapi.yaml`).
+Modules. Требования, схема базы и контракт API — в `docs/` в корне
+репозитория: `requirements.md`, `db-schema.md`, `api/openapi.yaml`.
 
 ## Запуск
 
