@@ -5,6 +5,12 @@ import { findSeat, getSeatMap } from './seatMap.js';
 
 const HOLD_MINUTES = 15; // BR-02
 
+// openapi.yaml, CreateOrderRequest.seat_ids: minItems 1, maxItems 10.
+// MAX экспортируется: на него опирается и UI (сколько мест даём выбрать на
+// схеме зала), и тесты границы — дублировать число в трёх местах нельзя.
+const MIN_SEATS_PER_ORDER = 1;
+export const MAX_SEATS_PER_ORDER = 10;
+
 const ordersById = new Map();
 
 function isoNow() {
@@ -57,15 +63,58 @@ function releaseSeats(order) {
   }
 }
 
-// Мок POST /orders (US-11, BR-01, BR-02): держит места 15 минут, статус
-// заказа сразу pending. Бросает OrderError с кодом SEAT_ALREADY_TAKEN, если
-// среди seatIds есть уже занятое — форма ошибки повторяет Error/details из
-// openapi.yaml, чтобы обработчик конфликта мог отличить его от прочих ошибок.
+// Проверяет seat_ids по CreateOrderRequest. Форма ошибки — VALIDATION_ERROR
+// с details[].field из openapi.yaml (описание схемы Error: поле-адрес для
+// этого кода — `field`), чтобы обработчик отличал её и от NOT_FOUND, и от
+// конфликта SEAT_ALREADY_TAKEN.
+//
+// Дубликаты контракт не описывает (uniqueItems у seat_ids нет), но пропускать
+// их нельзя: findSeat на повторный id возвращает тот же свободный объект,
+// проверка занятости проходит, и место попадает в заказ дважды — total_price
+// выходит кратно больше цены реально удержанных мест. Отдаём VALIDATION_ERROR,
+// а не SEAT_ALREADY_TAKEN: место свободно, ошибка в запросе, а код конфликта
+// увёл бы UI в сценарий US-13 «место уже заняли, выберите другое».
+function validateSeatIds(seatIds) {
+  const invalid = (message) =>
+    new OrderError('VALIDATION_ERROR', 'Ошибка валидации', [
+      { field: 'seat_ids', message },
+    ]);
+
+  if (!Array.isArray(seatIds)) throw invalid('Ожидается список id мест');
+
+  if (seatIds.length < MIN_SEATS_PER_ORDER) {
+    throw invalid('Выберите хотя бы одно место');
+  }
+  if (seatIds.length > MAX_SEATS_PER_ORDER) {
+    throw invalid(`За один раз можно выбрать не больше ${MAX_SEATS_PER_ORDER} мест`);
+  }
+  if (new Set(seatIds).size !== seatIds.length) {
+    throw invalid('Одно и то же место передано несколько раз');
+  }
+}
+
+// Мок POST /orders (US-11, BR-01, BR-02, BR-04): держит места 15 минут,
+// статус заказа сразу pending. Бросает OrderError с кодом SEAT_ALREADY_TAKEN,
+// если среди seatIds есть уже занятое — форма ошибки повторяет Error/details
+// из openapi.yaml, чтобы обработчик конфликта мог отличить его от прочих.
 export function createOrder({ sessionId, seatIds }) {
+  // Тело запроса проверяется до поиска сеанса: на бэкенде границы minItems/
+  // maxItems снимет схема запроса, то есть ещё до обработчика ручки.
+  validateSeatIds(seatIds);
+
   const session = getSession(sessionId);
   if (!session) throw new OrderError('NOT_FOUND', 'Сеанс не найден');
+
+  // BR-04 — два независимых условия, и статуса мало: прошедший сеанс остаётся
+  // 'active', пока его кто-нибудь не переведёт в 'completed', а в моке этого
+  // не делает никто. Без проверки времени бронь на вчерашний показ
+  // оформлялась без единой ошибки. Тот же вопрос в cancelOrder задан ниже —
+  // здесь его не было.
   if (session.status !== 'active') {
-    throw new OrderError('SESSION_NOT_ACTIVE', 'Сеанс отменён или уже завершён');
+    throw new OrderError('SESSION_NOT_ACTIVE', 'Сеанс отменён');
+  }
+  if (new Date(session.starts_at) <= new Date()) {
+    throw new OrderError('SESSION_NOT_ACTIVE', 'Сеанс уже начался');
   }
 
   const seats = seatIds.map((seatId) => findSeat(sessionId, seatId));
