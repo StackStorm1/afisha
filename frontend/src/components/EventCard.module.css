@@ -1,0 +1,175 @@
+.card {
+  flex: none;
+  width: 248px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-snap-align: start;
+}
+
+.poster {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-poster);
+  overflow: hidden;
+}
+
+.posterLink {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.favorite {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(11, 11, 17, 0.72);
+  color: var(--color-ink);
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  transition: background 0.14s;
+}
+
+.favorite[data-active='true'] {
+  background: var(--color-accent);
+}
+
+.soldOverlay {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(11, 11, 17, 0.72) 0 10px,
+    rgba(11, 11, 17, 0.84) 10px 20px
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-status-error);
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pillsRow {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap-reverse;
+}
+
+.pricePill {
+  height: 36px;
+  padding: 0 15px;
+  border-radius: var(--radius-pill);
+  background: rgba(11, 11, 17, 0.86);
+  backdrop-filter: blur(6px);
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.badgePill {
+  height: 36px;
+  padding: 0 13px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+  background: rgba(11, 11, 17, 0.86);
+  color: var(--color-status-warning);
+}
+
+.badgePill[data-tone='warningSolid'] {
+  background: var(--color-status-warning);
+  color: var(--color-bg);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.body:hover {
+  color: var(--color-ink);
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-cat-concert);
+}
+
+.meta[data-category='theatre'] {
+  color: var(--color-cat-theatre);
+}
+
+.meta[data-category='standup'] {
+  color: var(--color-cat-standup);
+}
+
+.meta[data-category='festival'] {
+  color: var(--color-cat-festival);
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.title[data-sold='true'] {
+  color: var(--color-ink-secondary);
+}
+
+.when {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.venue {
+  font-size: 13px;
+  color: var(--color-ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.venuePin {
+  font-size: 12px;
+}
+
+.note {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}

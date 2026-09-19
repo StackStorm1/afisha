@@ -1,0 +1,110 @@
+.wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 36px 32px;
+  margin-bottom: 44px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+
+.text {
+  min-width: 0;
+  max-width: 62ch;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+.description {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-ink-secondary);
+  margin: 0;
+}
+
+.resetButton {
+  height: 48px;
+  padding: 0 22px;
+  border: 0;
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.14s;
+}
+
+.resetButton:hover {
+  background: var(--color-accent-hover);
+}
+
+.scroller {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.altCard {
+  flex: none;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.altPoster {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-poster);
+  overflow: hidden;
+}
+
+.altPrice {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: var(--radius-pill);
+  background: rgba(11, 11, 17, 0.86);
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.altTitle {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.altWhen {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+}

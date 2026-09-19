@@ -1,0 +1,9 @@
+.main {
+  max-width: var(--grid-max-width);
+  margin: 0 auto;
+  padding: 0 40px 120px;
+}
+
+.feedSection {
+  padding: 44px 0 0;
+}

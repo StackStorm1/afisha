@@ -1,0 +1,72 @@
+.countLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  margin-bottom: 10px;
+}
+
+.row {
+  margin-bottom: 44px;
+}
+
+.rowHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.rowTitle {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.rowWhy {
+  font-size: 14px;
+  color: var(--color-ink-secondary);
+  margin-top: 8px;
+}
+
+.rowNav {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.navButton {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.navButton:hover {
+  background: var(--color-surface-hover);
+}
+
+.scroller {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.scroller::-webkit-scrollbar {
+  display: none;
+}

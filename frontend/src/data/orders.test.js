@@ -1,0 +1,280 @@
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { listEvents, listEventSessions } from './events.js';
+import { getSeatMap } from './seatMap.js';
+import {
+  createOrder,
+  payOrder,
+  cancelOrder,
+  listMyOrders,
+  getOrder,
+  MAX_SEATS_PER_ORDER,
+} from './orders.js';
+import { expectOrderDetail, expectPagination } from './schemaAssertions.js';
+
+function freeSession(minFreeSeats = 2) {
+  const events = listEvents({ per_page: 200 }).data;
+  for (const event of events) {
+    for (const session of listEventSessions(event.id)) {
+      if (session.status !== 'active') continue;
+      if (new Date(session.starts_at) <= new Date()) continue;
+      const seatMap = getSeatMap(session.id);
+      const freeSeats = seatMap.rows
+        .flatMap((row) => row.seats)
+        .filter((s) => s.status === 'free');
+      if (freeSeats.length >= minFreeSeats) return { session, freeSeats };
+    }
+  }
+  throw new Error(`в моках не нашлось сеанса с ${minFreeSeats} свободными местами`);
+}
+
+function cancelledSession() {
+  for (const event of listEvents({ per_page: 200 }).data) {
+    for (const session of listEventSessions(event.id)) {
+      if (session.status === 'cancelled') return session;
+    }
+  }
+  throw new Error('в моках не нашлось отменённого сеанса');
+}
+
+describe('orders mock — POST /orders (создание брони)', () => {
+  it('форма ответа соответствует OrderDetail, статус pending, держит места 15 минут', () => {
+    const { session, freeSeats } = freeSession();
+    const seatIds = [freeSeats[0].id, freeSeats[1].id];
+    const order = createOrder({ sessionId: session.id, seatIds });
+
+    expectOrderDetail(order);
+    expect(order.status).toBe('pending');
+    expect(order.session.id).toBe(session.id);
+    expect(order.seats.map((s) => s.id).sort()).toEqual(seatIds.sort());
+
+    const heldMinutes = (new Date(order.expires_at) - new Date(order.created_at)) / 60000;
+    expect(heldMinutes).toBeCloseTo(15, 0);
+  });
+
+  it('total_price — точная сумма цен мест, без придуманных строк комиссии', () => {
+    const { session, freeSeats } = freeSession();
+    const seatIds = [freeSeats[0].id, freeSeats[1].id];
+    const order = createOrder({ sessionId: session.id, seatIds });
+    const expected = order.seats.reduce((sum, s) => sum + Number(s.price), 0).toFixed(2);
+    expect(order.total_price).toBe(expected);
+  });
+
+  it('пустой список мест — VALIDATION_ERROR, заказ не создаётся (minItems 1)', () => {
+    const { session } = freeSession();
+    const before = listMyOrders({ per_page: 500 }).pagination.total;
+
+    expect.assertions(3);
+    try {
+      createOrder({ sessionId: session.id, seatIds: [] });
+    } catch (error) {
+      expect(error.code).toBe('VALIDATION_ERROR');
+      expect(error.details[0].field).toBe('seat_ids');
+    }
+    expect(listMyOrders({ per_page: 500 }).pagination.total).toBe(before);
+  });
+
+  it('больше 10 мест — VALIDATION_ERROR (maxItems 10)', () => {
+    const { session, freeSeats } = freeSession(MAX_SEATS_PER_ORDER + 1);
+    const seatIds = freeSeats.slice(0, MAX_SEATS_PER_ORDER + 1).map((seat) => seat.id);
+    expect(seatIds.length).toBe(MAX_SEATS_PER_ORDER + 1);
+
+    expect.assertions(3);
+    try {
+      createOrder({ sessionId: session.id, seatIds });
+    } catch (error) {
+      expect(error.code).toBe('VALIDATION_ERROR');
+      expect(error.details[0].field).toBe('seat_ids');
+    }
+  });
+
+  it('ровно 10 мест проходят — граница не сдвинута', () => {
+    const { session, freeSeats } = freeSession(MAX_SEATS_PER_ORDER);
+    const seatIds = freeSeats.slice(0, MAX_SEATS_PER_ORDER).map((seat) => seat.id);
+    const order = createOrder({ sessionId: session.id, seatIds });
+    expect(order.seats).toHaveLength(MAX_SEATS_PER_ORDER);
+  });
+
+  // Один id, переданный дважды, проходил проверку занятости (findSeat отдаёт
+  // тот же свободный объект) и попадал в заказ дважды — сумма выходила кратно
+  // больше цены реально удержанного места.
+  it('дубликат места — VALIDATION_ERROR, а не задвоенная сумма', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+
+    expect.assertions(3);
+    try {
+      createOrder({ sessionId: session.id, seatIds: [seatId, seatId] });
+    } catch (error) {
+      expect(error.code).toBe('VALIDATION_ERROR');
+      expect(error.details[0].field).toBe('seat_ids');
+    }
+
+    // Место осталось свободным: неудачная валидация ничего не удержала.
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+  });
+
+  it('отменённый сеанс — SESSION_NOT_ACTIVE (BR-04)', () => {
+    const session = cancelledSession();
+    const seatId = getSeatMap(session.id).rows[0].seats[0].id;
+
+    expect.assertions(1);
+    try {
+      createOrder({ sessionId: session.id, seatIds: [seatId] });
+    } catch (error) {
+      expect(error.code).toBe('SESSION_NOT_ACTIVE');
+    }
+  });
+
+  // Прошедший сеанс остаётся в статусе 'active': в 'completed' его в моке
+  // никто не переводит, поэтому одной проверки статуса для BR-04 мало.
+  it('сеанс уже начался — SESSION_NOT_ACTIVE, места не удерживаются (BR-04)', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const before = listMyOrders({ per_page: 500 }).pagination.total;
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(session.starts_at).getTime() + 1000);
+    expect.assertions(3);
+    try {
+      createOrder({ sessionId: session.id, seatIds: [seatId] });
+    } catch (error) {
+      expect(error.code).toBe('SESSION_NOT_ACTIVE');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(listMyOrders({ per_page: 500 }).pagination.total).toBe(before);
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+  });
+
+  it('повторная попытка забронировать то же место — SEAT_ALREADY_TAKEN (BR-01, US-13)', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    createOrder({ sessionId: session.id, seatIds: [seatId] });
+
+    expect.assertions(2);
+    try {
+      createOrder({ sessionId: session.id, seatIds: [seatId] });
+    } catch (error) {
+      expect(error.code).toBe('SEAT_ALREADY_TAKEN');
+      expect(error.details[0]).toHaveProperty('seat_id');
+    }
+  });
+});
+
+describe('orders mock — POST /orders/{id}/pay (US-14, US-16, BR-05)', () => {
+  it('success переводит заказ в paid, expires_at обнуляется', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    const paid = payOrder(order.id, { outcome: 'success' });
+
+    expect(paid.status).toBe('paid');
+    expect(paid.expires_at).toBeNull();
+  });
+
+  it('fail переводит заказ в failed и бросает PAYMENT_FAILED', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+
+    expect.assertions(2);
+    try {
+      payOrder(order.id, { outcome: 'fail' });
+    } catch (error) {
+      expect(error.code).toBe('PAYMENT_FAILED');
+    }
+    expect(getOrder(order.id).status).toBe('failed');
+  });
+
+  it('после отказа повторный вызов тем же заказом допустим без выбора мест заново (US-16)', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+
+    expect(() => payOrder(order.id, { outcome: 'fail' })).toThrow();
+    const retried = payOrder(order.id, { outcome: 'success' });
+    expect(retried.status).toBe('paid');
+    expect(retried.seats).toEqual(order.seats);
+  });
+
+  it('истечение удержания освобождает места (BR-02)', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(order.expires_at).getTime() + 1000);
+    expect.assertions(3);
+    try {
+      payOrder(order.id, { outcome: 'success' });
+    } catch (error) {
+      expect(error.code).toBe('BOOKING_EXPIRED');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(getOrder(order.id).status).toBe('cancelled');
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('orders mock — отмена и список заказов (US-15, US-17)', () => {
+  it('cancelOrder переводит заказ в cancelled', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    const cancelled = cancelOrder(order.id);
+    expect(cancelled.status).toBe('cancelled');
+  });
+
+  it('cancelOrder освобождает места — их снова можно забронировать (BR-02)', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+    cancelOrder(order.id);
+
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+
+    const rebooked = createOrder({ sessionId: session.id, seatIds: [seatId] });
+    expect(rebooked.seats[0].id).toBe(seatId);
+  });
+
+  it('повторная отмена уже отменённого заказа — ORDER_NOT_CANCELLABLE', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    cancelOrder(order.id);
+
+    expect.assertions(1);
+    try {
+      cancelOrder(order.id);
+    } catch (error) {
+      expect(error.code).toBe('ORDER_NOT_CANCELLABLE');
+    }
+  });
+
+  it('listMyOrders отдаёт OrderListResponse и фильтрует по статусу', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+
+    const { data, pagination } = listMyOrders({ status: 'pending' });
+    expectPagination(pagination);
+    expect(data.some((o) => o.id === order.id)).toBe(true);
+    for (const o of data) {
+      expectOrderDetail(o);
+      expect(o.status).toBe('pending');
+    }
+  });
+});

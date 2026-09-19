@@ -1,0 +1,121 @@
+:root {
+  /* Поверхности */
+  --color-bg: #0b0b11;
+  --color-surface: #12121a;
+  --color-surface-hover: #1a1a24;
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-control: rgba(255, 255, 255, 0.18);
+
+  /* Текст */
+  --color-ink: #f0eff6;
+  --color-ink-secondary: #b4aebe;
+  --color-ink-muted: #7c7791;
+  --color-ink-weak: #5d5872;
+
+  /* Акцент и ссылки */
+  --color-accent: #4a46c4;
+  --color-accent-hover: #5b57e0;
+  --color-link: #a9a6ff;
+
+  /* Категории событий */
+  --color-cat-concert: #a9a6ff;
+  --color-cat-theatre: #f0b060;
+  --color-cat-standup: #4fc7bc;
+  --color-cat-festival: #c08ce8;
+
+  /* Статусы */
+  --color-status-warning: #f0b060;
+  --color-status-error: #ff8fa4;
+
+  /* Радиусы — два слоя: афишный (постеры, пилюли) и служебный (поля, кнопки) */
+  --radius-poster: 18px;
+  --radius-pill: 999px;
+  --radius-control: 8px;
+  --radius-panel: 0;
+
+  /* Сетка */
+  --grid-max-width: 1440px;
+  --grid-gutter: 40px;
+  --grid-gap: 24px;
+
+  /* Типографика */
+  --font-display: 'Archivo Black', sans-serif;
+  --font-interface: 'Archivo', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* min-height, не height: с фиксированной height:100% контейнер #root
+   обрезается по высоте вьюпорта в качестве containing block для
+   position:sticky — sticky-шапка отрывалась от верха после ~700px
+   прокрутки на любой странице длиннее экрана. */
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-interface);
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: #c7c5ff;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+::selection {
+  background: rgba(74, 70, 196, 0.4);
+}
+
+/* Афишный голос: названия событий, крупные заголовки, текст CTA. */
+.u-poster {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+/* Всё, что должно читаться как число: даты, цены, счётчики. */
+.u-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Мелкие служебные подписи капсом (категории, лейблы). */
+.u-micro {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
