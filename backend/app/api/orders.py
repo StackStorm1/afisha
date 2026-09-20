@@ -17,7 +17,10 @@ async def create_order(body: CreateOrderRequest):
                 "code": "SEAT_ALREADY_TAKEN",
                 "message": "Одно или несколько выбранных мест уже заняты",
                 "details": [
-                    {"seat_id": str(TAKEN_SEAT_ID), "message": "Ряд 1, место 3 уже занято"}
+                    {
+                        "seat_id": str(TAKEN_SEAT_ID),
+                        "message": "Ряд 1, место 3 уже занято",
+                    }
                 ],
             },
         )

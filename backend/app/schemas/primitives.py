@@ -9,6 +9,7 @@ Money = Annotated[
     PlainSerializer(lambda v: f"{v:.2f}", return_type=str),
 ]
 
+
 class Pagination(BaseModel):
     page: int = Field(ge=1)
     per_page: int = Field(ge=1)

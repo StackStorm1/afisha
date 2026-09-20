@@ -11,7 +11,9 @@ def _body(code: str, message: str, details: list | None = None) -> dict:
     return result
 
 
-async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
     detail = exc.detail
     if isinstance(detail, dict):
         code = detail.get("code", "ERROR")
@@ -21,14 +23,23 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         code = "ERROR"
         message = str(detail) if detail else "Ошибка"
         details = None
-    return JSONResponse(status_code=exc.status_code, content=_body(code, message, details))
+    return JSONResponse(
+        status_code=exc.status_code, content=_body(code, message, details)
+    )
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     details = []
     for error in exc.errors():
         loc = [str(p) for p in error.get("loc", []) if p != "body"]
-        details.append({"field": ".".join(loc) if loc else "unknown", "message": error.get("msg", "")})
+        details.append(
+            {
+                "field": ".".join(loc) if loc else "unknown",
+                "message": error.get("msg", ""),
+            }
+        )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=_body("VALIDATION_ERROR", "Ошибка валидации", details),

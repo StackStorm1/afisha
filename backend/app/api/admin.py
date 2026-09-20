@@ -30,6 +30,7 @@ async def create_venue(body: CreateVenueRequest):
 async def update_venue(id: UUID, body: UpdateVenueRequest):
     return {"data": VENUE.model_dump(mode="json")}
 
+
 # ─── Events ──────────────────────────────────────────────────────────────────
 
 
@@ -41,6 +42,7 @@ async def create_event(body: CreateEventRequest):
 @router.patch("/events/{id}")
 async def update_event(id: UUID, body: UpdateEventRequest):
     return {"data": EVENT_BASE.model_dump(mode="json")}
+
 
 # ─── Sessions ────────────────────────────────────────────────────────────────
 
