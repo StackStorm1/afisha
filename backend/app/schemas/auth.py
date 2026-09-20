@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field, EmailStr, AwareDatetime
-from uuid import UUID
 from enum import StrEnum
+from uuid import UUID
+
+from pydantic import AwareDatetime, BaseModel, EmailStr, Field
+
 
 class UserClass(StrEnum):
     VISITOR = 'visitor'

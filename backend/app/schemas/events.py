@@ -1,8 +1,11 @@
-from pydantic import BaseModel, Field, ConfigDict, AwareDatetime
-from uuid import UUID
 from enum import StrEnum
+from uuid import UUID
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
 from app.schemas.categories import Category
 from app.schemas.primitives import Money, Pagination
+
 
 class AgeRating(StrEnum):
     ZERO_PLUS = '0+'

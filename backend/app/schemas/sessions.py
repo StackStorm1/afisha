@@ -1,9 +1,12 @@
-from pydantic import BaseModel, Field, ConfigDict, AwareDatetime
+from enum import StrEnum
 from uuid import UUID
-from app.schemas.venues import Venue
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
 from app.schemas.cities import City
 from app.schemas.primitives import Money
-from enum import StrEnum
+from app.schemas.venues import Venue
+
 
 class SessionStatus(StrEnum):
     ACTIVE = 'active'

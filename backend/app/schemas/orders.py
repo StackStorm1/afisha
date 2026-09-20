@@ -1,8 +1,11 @@
-from pydantic import BaseModel, Field, ConfigDict, AwareDatetime
-from uuid import UUID
 from enum import StrEnum
-from app.schemas.primitives import Money, Pagination
+from uuid import UUID
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
 from app.schemas.cities import City
+from app.schemas.primitives import Money, Pagination
+
 
 class PriceCategory(StrEnum):
     STALLS = 'stalls'

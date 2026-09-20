@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import Field, PlainSerializer, BaseModel
+from pydantic import BaseModel, Field, PlainSerializer
 
 Money = Annotated[
     Decimal,

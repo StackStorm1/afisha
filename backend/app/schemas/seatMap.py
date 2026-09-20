@@ -1,7 +1,10 @@
-from pydantic import Field, BaseModel, ConfigDict, AwareDatetime
-from uuid import UUID
 from enum import StrEnum
+from uuid import UUID
+
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
 from app.schemas.primitives import Money
+
 
 class SeatCategory(StrEnum):
     STALLS = 'stalls'

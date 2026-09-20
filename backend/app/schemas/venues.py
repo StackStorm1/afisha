@@ -1,6 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from app.schemas.cities import City
+
 
 class Venue(BaseModel):
     model_config = ConfigDict(from_attributes=True)
