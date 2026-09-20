@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -13,6 +13,8 @@ from app.schemas.orders import (
     OrderSessionRef,
     OrderVenueRef,
     PriceCategory,
+)
+from app.schemas.orders import (
     StatusCategory as OrderStatus,
 )
 from app.schemas.primitives import Pagination
@@ -21,8 +23,10 @@ from app.schemas.seatMap import (
     SeatInfo,
     SeatMap,
     SeatRow,
-    StatusCategory as SeatStatus,
     StatusType,
+)
+from app.schemas.seatMap import (
+    StatusCategory as SeatStatus,
 )
 from app.schemas.sessions import Session, SessionStatus
 from app.schemas.venues import Venue
@@ -68,8 +72,8 @@ EVENT_BASE = EventBase(
     category=CATEGORY,
     age_rating=AgeRating.SIXTEEN_PLUS,
     poster_url="https://cdn.example.com/hamlet.jpg",
-    created_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc),
-    updated_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc),
+    created_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=UTC),
+    updated_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=UTC),
 )
 
 EVENT_SUMMARY = EventSummary(
@@ -79,9 +83,9 @@ EVENT_SUMMARY = EventSummary(
     category=CATEGORY,
     age_rating=AgeRating.SIXTEEN_PLUS,
     poster_url="https://cdn.example.com/hamlet.jpg",
-    created_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc),
-    updated_at=datetime(2026, 9, 10, 12, 0, 0, tzinfo=timezone.utc),
-    nearest_session_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=timezone.utc),
+    created_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=UTC),
+    updated_at=datetime(2026, 9, 10, 12, 0, 0, tzinfo=UTC),
+    nearest_session_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=UTC),
     min_price=Decimal("2000.00"),
     sessions_count=5,
 )
@@ -93,9 +97,9 @@ EVENT_DETAIL = EventDetail(
     category=CATEGORY,
     age_rating=AgeRating.SIXTEEN_PLUS,
     poster_url="https://cdn.example.com/hamlet.jpg",
-    created_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc),
-    updated_at=datetime(2026, 9, 10, 12, 0, 0, tzinfo=timezone.utc),
-    nearest_session_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=timezone.utc),
+    created_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=UTC),
+    updated_at=datetime(2026, 9, 10, 12, 0, 0, tzinfo=UTC),
+    nearest_session_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=UTC),
     min_price=Decimal("2000.00"),
     sessions_count=5,
 )
@@ -107,7 +111,7 @@ SESSION = Session(
     event_id=EVENT_ID,
     venue=VENUE,
     city=CITY,
-    starts_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=timezone.utc),
+    starts_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=UTC),
     price=Decimal("2000.00"),
     total_seats=300,
     seats_left=142,
@@ -172,7 +176,7 @@ USER = UserProfile(
     id=USER_ID,
     email="user@example.com",
     role=UserClass.VISITOR,
-    created_at=datetime(2026, 9, 11, 10, 0, 0, tzinfo=timezone.utc),
+    created_at=datetime(2026, 9, 11, 10, 0, 0, tzinfo=UTC),
 )
 
 AUTH_RESPONSE = AuthResponse(
@@ -199,7 +203,7 @@ ORDER = OrderDetail(
             address="Театральная пл., 1",
             city=CITY,
         ),
-        starts_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=timezone.utc),
+        starts_at=datetime(2026, 10, 15, 19, 0, 0, tzinfo=UTC),
         price=Decimal("2000.00"),
     ),
     seats=[
@@ -220,7 +224,7 @@ ORDER = OrderDetail(
     ],
     total_price=Decimal("4000.00"),
     status=OrderStatus.PENDING,
-    expires_at=datetime(2026, 10, 1, 10, 15, 0, tzinfo=timezone.utc),
-    created_at=datetime(2026, 10, 1, 10, 0, 0, tzinfo=timezone.utc),
-    updated_at=datetime(2026, 10, 1, 10, 0, 0, tzinfo=timezone.utc),
+    expires_at=datetime(2026, 10, 1, 10, 15, 0, tzinfo=UTC),
+    created_at=datetime(2026, 10, 1, 10, 0, 0, tzinfo=UTC),
+    updated_at=datetime(2026, 10, 1, 10, 0, 0, tzinfo=UTC),
 )
