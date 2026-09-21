@@ -247,6 +247,65 @@ export function getOrder(orderId) {
   return ordersById.get(orderId) ?? null;
 }
 
+// --- Фоновое истечение броней (BR-02, requirements.md §7: освобождение мест
+// фоновой задачей раз в минуту) ---
+//
+// Раньше протухшая бронь освобождала места только при попытке оплаты
+// (payOrder): если посетитель закрыл вкладку, не нажав «оплатить», места
+// оставались 'held' до перезагрузки страницы. Бэкенд решает это периодической
+// задачей `UPDATE bookings SET status='EXPIRED' WHERE status='HELD' AND
+// expires_at < now()` раз в минуту (db-schema.md §3.9); здесь тот же цикл
+// эмулируется в мок-слое.
+
+// Периодичность — раз в минуту (requirements.md §7, db-schema.md §3.9).
+export const EXPIRY_SWEEP_INTERVAL_MS = 60 * 1000;
+
+// Активное удержание несут заказы в 'pending' и 'failed': у обоих expires_at
+// задан и места держатся до него (после отказа оплату можно повторить — US-16).
+// 'paid' обнуляет expires_at, 'cancelled' уже освободил места.
+function holdsSeats(order) {
+  return (
+    order.expires_at != null && order.status !== 'paid' && order.status !== 'cancelled'
+  );
+}
+
+// Переводит все протухшие брони в 'cancelled' и освобождает их места — та же
+// развязка, что и в ветке истечения payOrder, но применённая ко всем заказам
+// разом, не дожидаясь попытки оплаты. Возвращает список истёкших заказов,
+// чтобы UI мог по нему инвалидировать кэш схемы зала и списка заказов.
+export function expireStaleOrders(now = new Date()) {
+  const expired = [];
+  for (const order of ordersById.values()) {
+    if (!holdsSeats(order)) continue;
+    if (new Date(order.expires_at) >= now) continue;
+    order.status = 'cancelled';
+    order.updated_at = isoNow();
+    releaseSeats(order);
+    expired.push(order);
+  }
+  return expired;
+}
+
+let sweepTimer = null;
+
+// Запускает фоновый цикл истечения. onExpire(expiredOrders) вызывается только
+// когда что-то реально освободилось — на нём UI инвалидирует запросы. Повторный
+// вызов не плодит таймеры: один цикл на приложение. Возвращает функцию остановки.
+export function startExpirySweep(onExpire) {
+  if (sweepTimer != null) return stopExpirySweep;
+  sweepTimer = setInterval(() => {
+    const expired = expireStaleOrders();
+    if (expired.length > 0) onExpire?.(expired);
+  }, EXPIRY_SWEEP_INTERVAL_MS);
+  return stopExpirySweep;
+}
+
+export function stopExpirySweep() {
+  if (sweepTimer == null) return;
+  clearInterval(sweepTimer);
+  sweepTimer = null;
+}
+
 export function __seedOrder(order) {
   ordersById.set(order.id, order);
 }
