@@ -1,3 +1,4 @@
+from app.db.base import Base
 from app.models.bookings import Booking
 from app.models.categories import Category
 from app.models.cities import City
@@ -10,6 +11,7 @@ from app.models.users import User
 from app.models.venues import Venue
 
 __all__ = [
+    "Base",
     "Booking",
     "Category",
     "City",
