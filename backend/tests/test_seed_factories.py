@@ -18,13 +18,15 @@ def build(seed: int, events: int = 20, venues: int = 3, days: int = 7) -> dict:
     seats = _factories.make_seats(rng, venue_rows)
     buyers = _factories.make_buyers(rng, 3, "hash")
     event_rows = _factories.make_events(rng, events, CATEGORY_IDS)
-    sessions = _factories.make_sessions(rng, event_rows, venue_rows, 5, days, NOW)
+    sessions = _factories.make_sessions(
+        rng, event_rows, venue_rows, 5, days, NOW, past_days=3, cancelled_percent=20
+    )
 
     seats_by_venue: dict = {}
     for seat in seats:
         seats_by_venue.setdefault(seat["venue_id"], []).append(seat)
     orders, bookings, occupied = _factories.make_orders(
-        rng, sessions, seats_by_venue, buyers, 60, hold_minutes=15, now=NOW
+        rng, sessions, seats_by_venue, buyers, 60, 15, NOW, sold_out=2
     )
     return {
         "venues": venue_rows,
@@ -130,3 +132,43 @@ def test_occupied_counts_only_active_bookings() -> None:
             key = booking["session_id"]
             expected[key] = expected.get(key, 0) + 1
     assert data["occupied"] == expected
+
+
+def test_sessions_cover_every_status() -> None:
+    statuses = {session["status"] for session in build(9)["sessions"]}
+    assert statuses == {"ACTIVE", "CANCELLED", "COMPLETED"}
+
+
+def test_past_sessions_are_completed() -> None:
+    for session in build(9)["sessions"]:
+        if session["starts_at"] < NOW:
+            assert session["status"] == "COMPLETED"
+
+
+def test_cancelled_sessions_hold_no_active_bookings() -> None:
+    data = build(10)
+    cancelled = {s["id"] for s in data["sessions"] if s["status"] == "CANCELLED"}
+    active = [b for b in data["bookings"] if b["status"] in ("HELD", "PAID")]
+    assert not [b for b in active if b["session_id"] in cancelled]
+
+
+def test_past_sessions_have_no_holds() -> None:
+    data = build(11)
+    past = {s["id"] for s in data["sessions"] if s["starts_at"] < NOW}
+    held = [b for b in data["bookings"] if b["status"] == "HELD"]
+    assert not [b for b in held if b["session_id"] in past]
+
+
+def test_sold_out_sessions_are_fully_booked() -> None:
+    data = build(12)
+    totals = {s["id"]: s["seats_total"] for s in data["sessions"]}
+    full = [sid for sid, taken in data["occupied"].items() if taken == totals[sid]]
+    assert len(full) >= 2
+
+
+def test_paid_orders_are_created_before_the_show() -> None:
+    data = build(13)
+    starts = {s["id"]: s["starts_at"] for s in data["sessions"]}
+    for order in data["orders"]:
+        if order["status"] == "PAID":
+            assert order["created_at"] < starts[order["session_id"]]

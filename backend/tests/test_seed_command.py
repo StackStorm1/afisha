@@ -28,6 +28,12 @@ ARGS = [
     "3",
     "--seed",
     "1",
+    "--sold-out",
+    "2",
+    "--past-days",
+    "3",
+    "--cancelled-percent",
+    "20",
     "--truncate",
 ]
 
@@ -65,7 +71,8 @@ def test_volumes_follow_the_flags(seeded: None) -> None:
     assert scalar(select(func.count()).select_from(Venue)) == 2
     assert scalar(select(func.count()).select_from(User)) == 3
     assert scalar(select(func.count()).select_from(Event)) == 12
-    assert scalar(select(func.count()).select_from(Order)) == 40
+    # Распроданные сеансы добавляют заказы сверх --orders.
+    assert scalar(select(func.count()).select_from(Order)) > 40
     assert 24 <= scalar(select(func.count()).select_from(SessionModel)) <= 48
     assert scalar(select(func.count()).select_from(Seat)) > 0
     assert scalar(select(func.count()).select_from(Booking)) >= 40
@@ -117,3 +124,22 @@ def test_full_text_search_finds_generated_events(seeded: None) -> None:
               @@ plainto_tsquery('russian', (SELECT title FROM events LIMIT 1))
     """)
     assert scalar(query) > 0
+
+
+def test_every_session_status_is_present(seeded: None) -> None:
+    statuses = text("SELECT count(DISTINCT status) FROM sessions")
+    assert scalar(statuses) == 3
+
+
+def test_sold_out_sessions_exist(seeded: None) -> None:
+    query = text("SELECT count(*) FROM sessions WHERE seats_available = 0")
+    assert scalar(query) >= 2
+
+
+def test_cancelled_sessions_are_free_of_active_bookings(seeded: None) -> None:
+    query = text("""
+        SELECT count(*) FROM bookings b
+        JOIN sessions s ON s.id = b.session_id
+        WHERE s.status = 'CANCELLED' AND b.status IN ('HELD', 'PAID')
+    """)
+    assert scalar(query) == 0

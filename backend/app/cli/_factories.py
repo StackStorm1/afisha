@@ -111,13 +111,17 @@ def make_events(
 
 
 def _slots(
-    rng: random.Random, venues: list[dict], days: int, now: datetime
+    rng: random.Random,
+    venues: list[dict],
+    days: int,
+    past_days: int,
+    now: datetime,
 ) -> list[tuple[dict, datetime]]:
-    first_day = now.date() + timedelta(days=1)
+    first_day = now.date() - timedelta(days=past_days)
     slots = [
         (venue, datetime.combine(first_day + timedelta(days=offset), slot, tzinfo=MSK))
         for venue in venues
-        for offset in range(days)
+        for offset in range(past_days + days)
         for slot in SLOT_TIMES
     ]
     rng.shuffle(slots)
@@ -131,14 +135,16 @@ def make_sessions(
     per_event: int,
     days: int,
     now: datetime,
+    past_days: int = 0,
+    cancelled_percent: int = 0,
 ) -> list[dict]:
     counts = [rng.randint(max(1, per_event - 1), per_event + 1) for _ in events]
-    slots = _slots(rng, venues, days, now)
+    slots = _slots(rng, venues, days, past_days, now)
     if sum(counts) > len(slots):
         raise ValueError(
             f"нужно {sum(counts)} слотов, доступно {len(slots)} "
-            f"({len(venues)} площадок × {days} дней × {len(SLOT_TIMES)} слотов): "
-            f"увеличьте --venues или --days"
+            f"({len(venues)} площадок × {past_days + days} дней × "
+            f"{len(SLOT_TIMES)} слотов): увеличьте --venues или --days"
         )
 
     sessions = []
@@ -158,10 +164,20 @@ def make_sessions(
                     "base_price": Decimal(rng.randrange(low, high + 1, 50)),
                     "seats_total": seats_total,
                     "seats_available": seats_total,
-                    "status": SessionStatus.ACTIVE.value,
+                    "status": _session_status(rng, starts_at, now, cancelled_percent),
                 }
             )
     return sessions
+
+
+def _session_status(
+    rng: random.Random, starts_at: datetime, now: datetime, cancelled_percent: int
+) -> str:
+    if starts_at < now:
+        return SessionStatus.COMPLETED.value
+    if rng.randrange(100) < cancelled_percent:
+        return SessionStatus.CANCELLED.value
+    return SessionStatus.ACTIVE.value
 
 
 def _rows_of(seats: list[dict]) -> dict[int, list[dict]]:
@@ -171,6 +187,14 @@ def _rows_of(seats: list[dict]) -> dict[int, list[dict]]:
     for row in rows.values():
         row.sort(key=lambda seat: seat["seat_no"])
     return rows
+
+
+def _take_any(rng: random.Random, rows: dict[int, list[dict]]) -> list[dict]:
+    for size in (4, 3, 2, 1):
+        picked = _take_adjacent(rng, rows, size)
+        if picked:
+            return picked
+    return []
 
 
 def _take_adjacent(
@@ -192,6 +216,18 @@ def _price(base: Decimal, factor: Decimal) -> Decimal:
     return (base * factor).quantize(CENT, rounding=ROUND_HALF_EVEN)
 
 
+_PAID_PAIR = (OrderStatus.PAID.value, BookingStatus.PAID.value, "paid")
+
+
+def _forced_pair(
+    rng: random.Random, session: dict, now: datetime
+) -> tuple[str, str, str]:
+    # На прошедшем сеансе удержание невозможно: бронь либо оплачена, либо истекла.
+    if session["starts_at"] < now:
+        return _PAID_PAIR
+    return _status_pair(rng)
+
+
 def _status_pair(rng: random.Random) -> tuple[str, str, str]:
     roll = rng.random()
     if roll < 0.70:
@@ -211,26 +247,25 @@ def make_orders(
     count: int,
     hold_minutes: int,
     now: datetime,
+    sold_out: int = 0,
 ) -> tuple[list[dict], list[dict], dict[uuid.UUID, int]]:
-    sold = rng.sample(sessions, k=min(len(sessions), max(1, count // 3)))
+    # Отменённый сеанс освобождает места (BR-06), активных броней на нём быть
+    # не должно.
+    sellable = [s for s in sessions if s["status"] != SessionStatus.CANCELLED.value]
+    sold = rng.sample(sellable, k=min(len(sellable), max(1, count // 3)))
     free: dict[uuid.UUID, dict[int, list[dict]]] = {}
 
     orders: list[dict] = []
     bookings: list[dict] = []
     occupied: dict[uuid.UUID, int] = {}
 
-    for _ in range(count):
-        session = rng.choice(sold)
-        rows = free.setdefault(
-            session["id"], _rows_of(seats_by_venue[session["venue_id"]])
-        )
-        picked = _take_adjacent(rng, rows, rng.randint(1, 4))
-        if not picked:
-            continue
-
-        order_status, booking_status, kind = _status_pair(rng)
+    def place(
+        session: dict, picked: list[dict], kind_pair: tuple[str, str, str]
+    ) -> None:
+        order_status, booking_status, kind = kind_pair
         if kind == "paid":
-            created_at = now - timedelta(minutes=rng.randint(60, 45 * 24 * 60))
+            latest = min(now, session["starts_at"]) - timedelta(hours=1)
+            created_at = latest - timedelta(minutes=rng.randint(0, 45 * 24 * 60))
             paid_at = created_at + timedelta(minutes=rng.randint(1, 20))
             expires_at = None
         elif kind == "live":
@@ -280,7 +315,26 @@ def make_orders(
 
         if booking_status in (BookingStatus.HELD.value, BookingStatus.PAID.value):
             occupied[session["id"]] = occupied.get(session["id"], 0) + len(picked)
+            rows = free[session["id"]]
             for seat in picked:
                 rows[seat["row_no"]].remove(seat)
+
+    def rows_of(session: dict) -> dict[int, list[dict]]:
+        return free.setdefault(
+            session["id"], _rows_of(seats_by_venue[session["venue_id"]])
+        )
+
+    for _ in range(count):
+        session = rng.choice(sold)
+        picked = _take_adjacent(rng, rows_of(session), rng.randint(1, 4))
+        if picked:
+            place(session, picked, _forced_pair(rng, session, now))
+
+    # Полностью распроданные сеансы: без них UI не покажет состояние «продано».
+    upcoming = [s for s in sellable if s["starts_at"] > now]
+    for session in rng.sample(upcoming, k=min(sold_out, len(upcoming))):
+        rows = rows_of(session)
+        while picked := _take_any(rng, rows):
+            place(session, picked, _PAID_PAIR)
 
     return orders, bookings, occupied

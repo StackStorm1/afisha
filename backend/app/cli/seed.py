@@ -65,6 +65,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="заказов (по умолчанию 4000)",
     )
     parser.add_argument(
+        "--past-days",
+        type=int,
+        default=7,
+        help="сколько дней расписания в прошлом, статус COMPLETED (по умолчанию 7)",
+    )
+    parser.add_argument(
+        "--cancelled-percent",
+        type=int,
+        default=3,
+        help="доля отменённых сеансов в процентах (по умолчанию 3)",
+    )
+    parser.add_argument(
+        "--sold-out",
+        type=int,
+        default=12,
+        help="полностью распроданных сеансов (по умолчанию 12)",
+    )
+    parser.add_argument(
         "--buyers",
         type=int,
         default=7,
@@ -89,6 +107,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     for name in positive:
         if getattr(args, name) < 1:
             parser.error(f"--{name.replace('_', '-')} должен быть положительным")
+    non_negative = ("past_days", "cancelled_percent", "sold_out")
+    for name in non_negative:
+        if getattr(args, name) < 0:
+            parser.error(f"--{name.replace('_', '-')} не может быть отрицательным")
+    if not 0 <= args.cancelled_percent <= 100:
+        parser.error("--cancelled-percent задаётся в процентах, 0..100")
     return args
 
 
@@ -141,7 +165,14 @@ async def run(args: argparse.Namespace) -> None:
         buyers = _factories.make_buyers(rng, args.buyers, password_hash)
         events = _factories.make_events(rng, args.events, category_ids)
         sessions = _factories.make_sessions(
-            rng, events, venues, args.sessions_per_event, args.days, now
+            rng,
+            events,
+            venues,
+            args.sessions_per_event,
+            args.days,
+            now,
+            args.past_days,
+            args.cancelled_percent,
         )
 
         seats_by_venue: dict = {}
@@ -169,6 +200,7 @@ async def run(args: argparse.Namespace) -> None:
             args.orders,
             settings.booking_hold_minutes,
             now,
+            args.sold_out,
         )
 
         await _insert(session, Venue, venues)
