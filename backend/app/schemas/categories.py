@@ -1,13 +1,5 @@
-from enum import StrEnum
-
+from app.enums import CategoryCode
 from pydantic import BaseModel, ConfigDict, Field
-
-
-class CategoryCode(StrEnum):
-    CONCERT = "concert"
-    THEATRE = "theatre"
-    STANDUP = "standup"
-    FESTIVAL = "festival"
 
 
 class Category(BaseModel):

@@ -1,18 +1,10 @@
-from enum import StrEnum
+from app.enums import AgeRating
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from app.schemas.categories import Category
 from app.schemas.primitives import Money, Pagination
-
-
-class AgeRating(StrEnum):
-    ZERO_PLUS = "0+"
-    SIX_PLUS = "6+"
-    TWELVE_PLUS = "12+"
-    SIXTEEN_PLUS = "16+"
-    EIGHTEEN_PLUS = "18+"
 
 
 class EventBase(BaseModel):

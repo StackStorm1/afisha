@@ -1,38 +1,19 @@
-from enum import StrEnum
+from app.enums import PriceCategory, SessionStatus, OrderStatus
 from uuid import UUID
-
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
-
 from app.schemas.primitives import Money
-
-
-class SeatCategory(StrEnum):
-    STALLS = "stalls"
-    BALCONY = "balcony"
-
-
-class StatusCategory(StrEnum):
-    FREE = "free"
-    HELD = "held"
-    PAID = "paid"
-
-
-class StatusType(StrEnum):
-    ACTIVE = "active"
-    CANCELLED = "cancelled"
-    COMPLETED = "completed"
 
 
 class SeatInfo(BaseModel):
     id: UUID
     seat_no: int = Field(..., ge=1, examples=[12])
-    price_category: SeatCategory = Field(
+    price_category: PriceCategory = Field(
         ...,
         description="Ценовая категория места. В БД — в верхнем регистре.",
         examples=["stalls"],
     )
     price: Money
-    status: StatusCategory = Field(
+    status: OrderStatus = Field(
         ...,
         description="Публичное состояние места: `free` — свободно, `held` — удерживается чьей-то бронью, `paid` — продано. Истёкшие брони не учитываются, такое место снова `free`.",
         examples=["free"],
@@ -55,7 +36,7 @@ class SeatMap(BaseModel):
         }
     )
     session_id: UUID
-    status: StatusType = Field(..., examples=["active"])
+    status: SessionStatus = Field(..., examples=["active"])
     price: Money = Field(
         ...,
         description="Базовая цена сеанса. Цена конкретного места — `price` внутри `SeatInfo`: `base_price × seats.price_factor` (db-schema §3.5).",
