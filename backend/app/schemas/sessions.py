@@ -1,9 +1,15 @@
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from app.enums import SessionStatus
 from app.schemas.cities import City
+
+
+class SessionStatus(StrEnum):
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
 from app.schemas.primitives import Money, Pagination
 from app.schemas.venues import Venue
 

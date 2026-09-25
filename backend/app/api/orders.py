@@ -3,12 +3,12 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.errors import ErrorCode
-from app.enums import OrderStatus
 from app.schemas.errors import ErrorResponse
 from app.schemas.orders import (
     CreateOrderRequest,
     OrderDetailResponse,
     OrderListResponse,
+    OrderStatus,
 )
 from app.stubs.fixtures import ORDER, PAGINATION, TAKEN_SEAT_ID
 

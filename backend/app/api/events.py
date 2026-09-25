@@ -4,10 +4,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from app.enums import SessionStatus
 from app.schemas.errors import ErrorResponse
 from app.schemas.events import EventListResponse, EventResponse
-from app.schemas.sessions import SessionListResponse
+from app.schemas.sessions import SessionListResponse, SessionStatus
 from app.stubs.fixtures import EVENT_DETAIL, EVENT_SUMMARY, PAGINATION, SESSION
 
 router = APIRouter(prefix="/events", tags=["events"])

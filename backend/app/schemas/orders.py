@@ -1,9 +1,21 @@
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from app.enums import OrderStatus, PriceCategory
 from app.schemas.cities import City
+
+
+class OrderStatus(StrEnum):
+    PENDING = "pending"
+    PAID = "paid"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class PriceCategory(StrEnum):
+    STALLS = "stalls"
+    BALCONY = "balcony"
 from app.schemas.primitives import Money, Pagination
 
 

@@ -22,21 +22,21 @@ class AgeRating(StrEnum):
 
 
 class PriceCategory(StrEnum):
-    STALLS = "stalls"
-    BALCONY = "balcony"
+    STALLS = "STALLS"
+    BALCONY = "BALCONY"
 
 
 class SessionStatus(StrEnum):
-    ACTIVE = "active"
-    CANCELLED = "cancelled"
-    COMPLETED = "completed"
+    ACTIVE = "ACTIVE"
+    CANCELLED = "CANCELLED"
+    COMPLETED = "COMPLETED"
 
 
 class OrderStatus(StrEnum):
-    PENDING = "pending"
-    PAID = "paid"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
+    PENDING = "PENDING"
+    PAID = "PAID"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class BookingStatus(StrEnum):

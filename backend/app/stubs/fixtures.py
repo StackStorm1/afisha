@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from app.enums import OrderStatus, PriceCategory, SeatStatus, SessionStatus, UserRole
+from app.enums import SeatStatus, UserRole
 from app.schemas.auth import AuthResponse, AuthResponseData, UserProfile
 from app.schemas.categories import Category, CategoryCode
 from app.schemas.cities import City
@@ -12,7 +12,9 @@ from app.schemas.orders import (
     OrderDetail,
     OrderEventRef,
     OrderSessionRef,
+    OrderStatus,
     OrderVenueRef,
+    PriceCategory,
 )
 from app.schemas.primitives import Pagination
 from app.schemas.seatMap import (
@@ -20,7 +22,7 @@ from app.schemas.seatMap import (
     SeatMap,
     SeatRow,
 )
-from app.schemas.sessions import Session
+from app.schemas.sessions import Session, SessionStatus
 from app.schemas.venues import Venue
 
 # ─── IDs ─────────────────────────────────────────────────────────────────────

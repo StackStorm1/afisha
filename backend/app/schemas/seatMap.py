@@ -1,9 +1,21 @@
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from app.enums import PriceCategory, SeatStatus, SessionStatus
+from app.enums import SeatStatus
 from app.schemas.primitives import Money
+
+
+class PriceCategory(StrEnum):
+    STALLS = "stalls"
+    BALCONY = "balcony"
+
+
+class SessionStatus(StrEnum):
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
 
 
 class SeatInfo(BaseModel):
