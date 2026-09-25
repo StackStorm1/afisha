@@ -9,6 +9,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -48,7 +49,7 @@ class Event(Base):
         DateTime(timezone=True), server_default=text("now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("now()")
+        DateTime(timezone=True), server_default=text("now()"), onupdate=func.now()
     )
 
     category: Mapped["Category"] = relationship(back_populates="events", lazy="raise")

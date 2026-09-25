@@ -38,3 +38,6 @@ class AuthResponseData(BaseModel):
 
 class AuthResponse(BaseModel):
     data: AuthResponseData
+
+class UserProfileResponse(BaseModel):
+    data: UserProfile

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     booking_hold_minutes: int = 15
 
+    api_prefix: str = "/api/v1"
     backend_cors_origins: str = "http://localhost"
     environment: str = "local"
     log_level: str = "info"

@@ -1,7 +1,8 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.primitives import Pagination
 from app.schemas.cities import City
 
 
@@ -36,7 +37,28 @@ class UpdateVenueRequest(BaseModel):
                 "Геометрия зала (`rows_count`, `seats_per_row`) и город не редактируются: "
                 "по ним уже сгенерированы места, на которые ссылаются брони (BR-08)."
             )
-        }
+        },
+        extra="forbid"
     )
-    name: str | None = Field(default=None, max_length=255)
-    address: str | None = Field(default=None, max_length=500)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    address: str | None = Field(default=None, min_length=1, max_length=500)
+    
+    @model_validator(mode="before")
+    @classmethod
+    def validate_body(cls, data):
+        for field, value in data.items():
+            if value is None and field in {"name","address"}:
+                raise ValueError(f"{field} cannot be null")
+        if not data:
+            raise ValueError(f"Необходимо передать хотя бы одно поле")
+        return data
+            
+    
+
+class VenueResponse(BaseModel):
+    data: Venue
+    
+
+class VenueListResponse(BaseModel):
+    data: list[Venue]
+    pagination: Pagination    

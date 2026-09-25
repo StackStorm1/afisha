@@ -21,22 +21,22 @@ class AgeRating(StrEnum):
     EIGHTEEN_PLUS = "18+"
 
 
-class PriceCategory(StrEnum): 
-    STALLS = "STALLS"
-    BALCONY = "BALCONY"
+class PriceCategory(StrEnum):
+    STALLS = "stalls"
+    BALCONY = "balcony"
 
 
-class SessionStatus(StrEnum): 
-    ACTIVE = "ACTIVE"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
+class SessionStatus(StrEnum):
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
 
 
 class OrderStatus(StrEnum):
-    PENDING = "PENDING"
-    PAID = "PAID"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
+    PENDING = "pending"
+    PAID = "paid"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class BookingStatus(StrEnum): 
@@ -44,3 +44,8 @@ class BookingStatus(StrEnum):
     PAID = "PAID"
     EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
+
+class SeatStatus(StrEnum):
+    FREE = "free"
+    HELD = "held"
+    PAID = "paid"

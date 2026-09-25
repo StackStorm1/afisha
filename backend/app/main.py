@@ -17,17 +17,16 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    setup_logging(get_settings().log_level)
+    settings = get_settings()
+    setup_logging(settings.log_level)
     yield
 
 
 app = FastAPI(lifespan=lifespan)
 
-_settings = get_settings()
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_settings.cors_origins_list,
+    allow_origins=get_settings().cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,15 +35,15 @@ app.add_middleware(
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
-PREFIX = "/api/v1"
+_prefix = get_settings().api_prefix
 
-app.include_router(auth.router, prefix=PREFIX)
-app.include_router(cities.router, prefix=PREFIX)
-app.include_router(categories.router, prefix=PREFIX)
-app.include_router(events.router, prefix=PREFIX)
-app.include_router(sessions.router, prefix=PREFIX)
-app.include_router(orders.router, prefix=PREFIX)
-app.include_router(admin.router, prefix=PREFIX)
+app.include_router(auth.router, prefix=_prefix)
+app.include_router(cities.router, prefix=_prefix)
+app.include_router(categories.router, prefix=_prefix)
+app.include_router(events.router, prefix=_prefix)
+app.include_router(sessions.router, prefix=_prefix)
+app.include_router(orders.router, prefix=_prefix)
+app.include_router(admin.router, prefix=_prefix)
 
 
 @app.get("/health")

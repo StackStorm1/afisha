@@ -2,7 +2,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from app.schemas.auth import AuthResponse, AuthResponseData, UserClass, UserProfile
+from app.enums import OrderStatus, PriceCategory, SeatStatus, SessionStatus, UserRole
+from app.schemas.auth import AuthResponse, AuthResponseData, UserProfile
 from app.schemas.categories import Category, CategoryCode
 from app.schemas.cities import City
 from app.schemas.events import AgeRating, EventBase, EventDetail, EventSummary
@@ -12,23 +13,14 @@ from app.schemas.orders import (
     OrderEventRef,
     OrderSessionRef,
     OrderVenueRef,
-    PriceCategory,
-)
-from app.schemas.orders import (
-    StatusCategory as OrderStatus,
 )
 from app.schemas.primitives import Pagination
 from app.schemas.seatMap import (
-    SeatCategory,
     SeatInfo,
     SeatMap,
     SeatRow,
-    StatusType,
 )
-from app.schemas.seatMap import (
-    StatusCategory as SeatStatus,
-)
-from app.schemas.sessions import Session, SessionStatus
+from app.schemas.sessions import Session
 from app.schemas.venues import Venue
 
 # ─── IDs ─────────────────────────────────────────────────────────────────────
@@ -124,7 +116,7 @@ SESSION = Session(
 
 SEAT_MAP = SeatMap(
     session_id=SESSION_ID,
-    status=StatusType.ACTIVE,
+    status=SessionStatus.ACTIVE,
     price=Decimal("2000.00"),
     rows=[
         SeatRow(
@@ -133,25 +125,25 @@ SEAT_MAP = SeatMap(
                 SeatInfo(
                     id=SEAT_FREE_ID,
                     seat_no=1,
-                    price_category=SeatCategory.STALLS,
-                    price=Decimal("2000.00"),
-                    status=SeatStatus.FREE,
-                    held_by_me=False,
-                ),
-                SeatInfo(
-                    id=SEAT_HELD_ID,
-                    seat_no=2,
-                    price_category=SeatCategory.STALLS,
+                    price_category=PriceCategory.STALLS,
                     price=Decimal("2000.00"),
                     status=SeatStatus.HELD,
                     held_by_me=True,
                 ),
                 SeatInfo(
+                    id=SEAT_HELD_ID,
+                    seat_no=2,
+                    price_category=PriceCategory.STALLS,
+                    price=Decimal("2000.00"),
+                    status=SeatStatus.FREE,
+                    held_by_me=False,
+                ),
+                SeatInfo(
                     id=TAKEN_SEAT_ID,
                     seat_no=3,
-                    price_category=SeatCategory.STALLS,
+                    price_category=PriceCategory.STALLS,
                     price=Decimal("2000.00"),
-                    status=SeatStatus.PAID,
+                    status=SeatStatus.HELD,
                     held_by_me=False,
                 ),
             ],
@@ -162,7 +154,7 @@ SEAT_MAP = SeatMap(
                 SeatInfo(
                     id=SEAT_BALCONY_ID,
                     seat_no=1,
-                    price_category=SeatCategory.BALCONY,
+                    price_category=PriceCategory.BALCONY,
                     price=Decimal("1600.00"),
                     status=SeatStatus.FREE,
                     held_by_me=False,
@@ -177,7 +169,7 @@ SEAT_MAP = SeatMap(
 USER = UserProfile(
     id=USER_ID,
     email="user@example.com",
-    role=UserClass.VISITOR,
+    role=UserRole.VISITOR,
     created_at=datetime(2026, 9, 11, 10, 0, 0, tzinfo=UTC),
 )
 

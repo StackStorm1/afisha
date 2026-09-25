@@ -2,8 +2,28 @@ from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from enum import StrEnum
 
-
+class ErrorCode(StrEnum):
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    UNAUTHORIZED = 'UNAUTHORIZED'
+    FORBIDDEN = 'FORBIDDEN'
+    NOT_FOUND = 'NOT_FOUND'
+    EMAIL_ALREADY_TAKEN = 'EMAIL_ALREADY_TAKEN'
+    INVALID_CREDENTIALS = 'INVALID_CREDENTIALS'
+    SESSION_NOT_ACTIVE = 'SESSION_NOT_ACTIVE'
+    SESSION_IN_PAST = 'SESSION_IN_PAST'
+    SESSION_ALREADY_CANCELLED = 'SESSION_ALREADY_CANCELLED'
+    SEAT_ALREADY_TAKEN = 'SEAT_ALREADY_TAKEN'
+    ORDER_NOT_CANCELLABLE = 'ORDER_NOT_CANCELLABLE'
+    ORDER_ALREADY_PAID = 'ORDER_ALREADY_PAID'
+    BOOKING_EXPIRED = 'BOOKING_EXPIRED'
+    SESSION_ALREADY_STARTED = 'SESSION_ALREADY_STARTED'
+    VENUE_BUSY = 'VENUE_BUSY'
+    PAYMENT_FAILED = 'PAYMENT_FAILED'
+    TOKEN_EXPIRED = 'TOKEN_EXPIRED'
+    INTERNAL_ERROR = 'INTERNAL_ERROR'
+    
 def _body(code: str, message: str, details: list | None = None) -> dict:
     result: dict = {"code": code, "message": message}
     if details:

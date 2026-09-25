@@ -1,4 +1,4 @@
-from app.enums import PriceCategory, SessionStatus, OrderStatus
+from app.enums import PriceCategory, SessionStatus, SeatStatus
 from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from app.schemas.primitives import Money
@@ -13,7 +13,7 @@ class SeatInfo(BaseModel):
         examples=["stalls"],
     )
     price: Money
-    status: OrderStatus = Field(
+    status: SeatStatus = Field(
         ...,
         description="Публичное состояние места: `free` — свободно, `held` — удерживается чьей-то бронью, `paid` — продано. Истёкшие брони не учитываются, такое место снова `free`.",
         examples=["free"],
@@ -74,3 +74,7 @@ class UpdateSessionRequest(BaseModel):
     venue_id: UUID | None = None
     starts_at: AwareDatetime | None = None
     price: Money | None = None
+
+
+class SeatMapResponse(BaseModel):
+    data: SeatMap

@@ -13,3 +13,6 @@ class Category(BaseModel):
     )
     name: str = Field(..., max_length=100, examples=["Театр"])
     slug: str = Field(..., max_length=100, examples=["theatre"])
+
+class CategoryListResponse(BaseModel):
+    data: list[Category]

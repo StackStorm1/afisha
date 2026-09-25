@@ -1,22 +1,10 @@
-from enum import StrEnum
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
+from app.enums import OrderStatus, PriceCategory
 from app.schemas.cities import City
 from app.schemas.primitives import Money, Pagination
-
-
-class PriceCategory(StrEnum):
-    STALLS = "stalls"
-    BALCONY = "balcony"
-
-
-class StatusCategory(StrEnum):
-    PENDING = "pending"
-    PAID = "paid"
-    CANCELLED = "cancelled"
-    FAILED = "failed"
 
 
 class CreateOrderRequest(BaseModel):
@@ -75,7 +63,7 @@ class OrderDetail(BaseModel):
     session: OrderSessionRef
     seats: list[BookedSeat]
     total_price: Money
-    status: StatusCategory = Field(..., examples=["pending"])
+    status: OrderStatus = Field(..., examples=["pending"])
     expires_at: AwareDatetime | None = Field(
         None,
         description="Время истечения удержания мест. Заполнено только для статуса pending (BR-02).",
@@ -88,3 +76,7 @@ class OrderDetail(BaseModel):
 class OrderListResponse(BaseModel):
     data: list[OrderDetail]
     pagination: Pagination
+
+
+class OrderDetailResponse(BaseModel):
+    data: OrderDetail

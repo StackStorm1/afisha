@@ -1,7 +1,7 @@
 from app.enums import AgeRating
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.categories import Category
 from app.schemas.primitives import Money, Pagination
@@ -60,13 +60,20 @@ class EventDetail(EventSummary):
     pass
 
 
+class EventResponse(BaseModel):
+    data: EventDetail
+
+
+class EventBaseResponse(BaseModel):    
+    data: EventBase
+    
 class EventListResponse(BaseModel):
     data: list[EventSummary]
     pagination: Pagination
 
 
 class CreateEventRequest(BaseModel):
-    title: str = Field(..., max_length=255)
+    title: str = Field(..., min_length=1, max_length=255)
     description: str | None = Field(None)
     category_id: int
     age_rating: AgeRating
@@ -77,11 +84,24 @@ class UpdateEventRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "description": "Все поля опциональны — передавать только изменяемые"
-        }
+        },
+        extra="forbid"
     )
 
-    title: str | None = Field(None, max_length=255)
+    title: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = Field(None)
-    category_id: int | None = Field(None)
+    category_id: int | None = Field(None, ge=1)
     age_rating: AgeRating | None = Field(None)
     poster_url: str | None = Field(None, max_length=500)
+    
+    @model_validator(mode="before")
+    @classmethod
+    def validate_body(cls, data):
+        non_null_fields = {"title", "category_id"}
+        for field, value in data.items():
+            if value is None and field in non_null_fields:
+                raise ValueError(f"{field} cannot be null")
+        if not data:
+            raise ValueError(f"Необходимо передать хотя бы одно поле")
+        return data
+
