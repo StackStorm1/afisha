@@ -1,9 +1,11 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+
 
 class ErrorDetail(BaseModel):
     field: str | None = None
     seat_id: str | None = None
     message: str
+
 
 class ErrorResponse(BaseModel):
     code: str

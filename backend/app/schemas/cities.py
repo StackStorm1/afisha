@@ -8,5 +8,6 @@ class City(BaseModel):
     name: str = Field(..., max_length=100, examples=["Москва"])
     slug: str = Field(..., max_length=100, examples=["moskva"])
 
+
 class CityListResponse(BaseModel):
     data: list[City]

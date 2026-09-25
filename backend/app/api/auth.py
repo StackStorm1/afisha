@@ -1,9 +1,13 @@
 from fastapi import APIRouter
 
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserProfileResponse
+from app.schemas.auth import (
+    AuthResponse,
+    LoginRequest,
+    RegisterRequest,
+    UserProfileResponse,
+)
 from app.schemas.errors import ErrorResponse
 from app.stubs.fixtures import AUTH_RESPONSE, USER
-
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -18,7 +22,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
         422: {"model": ErrorResponse, "description": "Ошибка валидации"},
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
-    )
+)
 async def register(body: RegisterRequest):
     return AUTH_RESPONSE.model_dump(mode="json")
 
@@ -33,7 +37,7 @@ async def register(body: RegisterRequest):
         422: {"model": ErrorResponse, "description": "Ошибка валидации"},
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
-    )
+)
 async def login(body: LoginRequest):
     return AUTH_RESPONSE.model_dump(mode="json")
 
@@ -44,9 +48,12 @@ async def login(body: LoginRequest):
     response_model=UserProfileResponse,
     summary="Профиль текущего пользователя",
     responses={
-        401: {"model": ErrorResponse, "description": "Токен отсутствует или недействителен"},
+        401: {
+            "model": ErrorResponse,
+            "description": "Токен отсутствует или недействителен",
+        },
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
-    }
-    )
+    },
+)
 async def get_me():
     return {"data": USER.model_dump(mode="json")}

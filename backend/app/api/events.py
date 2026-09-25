@@ -24,10 +24,18 @@ router = APIRouter(prefix="/events", tags=["events"])
 )
 async def list_events(
     category: str | None = Query(None, description="Slug категории"),
-    date_from: date | None = Query(None, description="Нижняя граница даты начала сеанса"),
-    date_to: date | None = Query(None, description="Верхняя граница даты начала сеанса"),
-    q: str | None = Query(None, description="Полнотекстовый поиск по названию и описанию"),
-    sort: Literal["date_asc", "date_desc", "price_asc", "price_desc"] = Query("date_asc", description="Сортировка результатов"),
+    date_from: date | None = Query(
+        None, description="Нижняя граница даты начала сеанса"
+    ),
+    date_to: date | None = Query(
+        None, description="Верхняя граница даты начала сеанса"
+    ),
+    q: str | None = Query(
+        None, description="Полнотекстовый поиск по названию и описанию"
+    ),
+    sort: Literal["date_asc", "date_desc", "price_asc", "price_desc"] = Query(
+        "date_asc", description="Сортировка результатов"
+    ),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
@@ -45,23 +53,23 @@ async def list_events(
     responses={
         404: {"model": ErrorResponse, "description": "Ресурс не найден"},
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
-        },
-    )
+    },
+)
 async def get_event(id: UUID):
     return {"data": EVENT_DETAIL.model_dump(mode="json")}
 
 
 @router.get(
-    "/{id}/sessions", 
+    "/{id}/sessions",
     tags=["sessions"],
     status_code=200,
     response_model=SessionListResponse,
     summary="Список сеансов события",
     responses={
-            404: {"model": ErrorResponse, "description": "Ресурс не найден"},
-            500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
-        },
-    )
+        404: {"model": ErrorResponse, "description": "Ресурс не найден"},
+        500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
+    },
+)
 async def list_event_sessions(
     id: UUID,
     date_from: date | None = Query(None),

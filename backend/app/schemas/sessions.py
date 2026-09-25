@@ -3,9 +3,8 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.enums import SessionStatus
-from app.schemas.primitives import Pagination
 from app.schemas.cities import City
-from app.schemas.primitives import Money
+from app.schemas.primitives import Money, Pagination
 from app.schemas.venues import Venue
 
 
@@ -32,15 +31,15 @@ class UpdateSessionRequest(BaseModel):
         json_schema_extra={
             "description": "Все поля опциональны — передавать только изменяемые. `total_seats` производен от площадки и не редактируется."
         },
-        extra="forbid"
+        extra="forbid",
     )
     venue_id: UUID | None = Field(
-        None, 
+        None,
         description="Смена площадки допустима, пока по сеансу нет активных броней",
     )
     starts_at: AwareDatetime | None = Field(None)
     price: Money | None = Field(None)
-    
+
     @model_validator(mode="before")
     @classmethod
     def validate_body(cls, data):
@@ -48,12 +47,14 @@ class UpdateSessionRequest(BaseModel):
             if value is None and field in {"starts_at", "price"}:
                 raise ValueError(f"{field} cannot be null")
         if not data:
-            raise ValueError(f"Необходимо передать хотя бы одно поле")
+            raise ValueError("Необходимо передать хотя бы одно поле")
         return data
-    
+
+
 class SessionResponse(BaseModel):
     data: Session
-    
+
+
 class SessionListResponse(BaseModel):
     data: list[Session]
     pagination: Pagination

@@ -15,6 +15,6 @@ router = APIRouter(prefix="/categories", tags=["categories"])
     responses={
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
-    )
+)
 async def list_categories():
     return {"data": [CATEGORY.model_dump(mode="json")]}

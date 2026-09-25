@@ -1,6 +1,8 @@
-from app.enums import PriceCategory, SessionStatus, SeatStatus
 from uuid import UUID
+
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
+from app.enums import PriceCategory, SeatStatus, SessionStatus
 from app.schemas.primitives import Money
 
 

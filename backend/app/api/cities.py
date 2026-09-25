@@ -13,8 +13,8 @@ router = APIRouter(prefix="/cities", tags=["cities"])
     response_model=CityListResponse,
     summary="Список городов",
     responses={
-        500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},    
-    }
-    )
+        500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
+    },
+)
 async def list_cities():
     return {"data": [CITY.model_dump(mode="json")]}

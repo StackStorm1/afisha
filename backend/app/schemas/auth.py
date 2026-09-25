@@ -1,6 +1,8 @@
-from app.enums import UserRole
 from uuid import UUID
+
 from pydantic import AwareDatetime, BaseModel, EmailStr, Field
+
+from app.enums import UserRole
 
 
 class RegisterRequest(BaseModel):
@@ -38,6 +40,7 @@ class AuthResponseData(BaseModel):
 
 class AuthResponse(BaseModel):
     data: AuthResponseData
+
 
 class UserProfileResponse(BaseModel):
     data: UserProfile

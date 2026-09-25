@@ -1,5 +1,6 @@
-from app.enums import CategoryCode
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.enums import CategoryCode
 
 
 class Category(BaseModel):
@@ -13,6 +14,7 @@ class Category(BaseModel):
     )
     name: str = Field(..., max_length=100, examples=["Театр"])
     slug: str = Field(..., max_length=100, examples=["theatre"])
+
 
 class CategoryListResponse(BaseModel):
     data: list[Category]
