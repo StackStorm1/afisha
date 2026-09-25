@@ -180,33 +180,19 @@
 
 .ghostButton:hover {
   background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+/* Кнопка раздела, в котором сейчас пользователь (NavLink ставит .active). */
+.ghostButton:global(.active) {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: var(--color-surface-hover);
 }
 
 .favCount {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-link);
-}
-
-.primaryButton {
-  height: 44px;
-  padding: 0 18px;
-  border-radius: var(--radius-pill);
-  border: 0;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  transition: background 0.14s;
-  text-decoration: none;
-}
-
-.primaryButton:hover {
-  background: var(--color-accent-hover);
 }
 
 .loginButton {
@@ -447,7 +433,6 @@
   }
 
   .ghostButton,
-  .primaryButton,
   .loginButton {
     padding: 0 12px;
   }

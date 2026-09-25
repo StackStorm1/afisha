@@ -9,6 +9,7 @@ import { useEventDateStrip } from '../lib/useEventSessions.js';
 import { buildSessionRowView } from '../lib/sessionRowView.js';
 import { getSessionZones, ZONE_LABELS } from '../lib/cardBadge.js';
 import { useFavorites } from '../store/useFavorites.js';
+import { useAuth } from '../store/useAuth.js';
 import {
   formatDuration,
   formatPrice,
@@ -17,9 +18,6 @@ import {
 } from '../lib/format.js';
 import styles from './EventPage.module.css';
 
-// Состояние авторизации приходит снаружи — стора авторизации ещё нет,
-// см. Header.jsx.
-const AUTHORIZED = false;
 const DESCRIPTION_CLAMP_THRESHOLD = 180;
 
 function nextOpenSession(activeSessions) {
@@ -34,6 +32,7 @@ export default function EventPage() {
   const { eventId } = useParams();
   const event = getEvent(eventId);
   const [expanded, setExpanded] = useState(false);
+  const authorized = useAuth((s) => s.status === 'visitor');
   const isFavorite = useFavorites((s) => (event ? s.isFavorite(event.id) : false));
   const toggleFavorite = useFavorites((s) => s.toggle);
   const { days, setSelectedDay, daySessions, allSessions } = useEventDateStrip(eventId);
@@ -41,7 +40,7 @@ export default function EventPage() {
   if (!event) {
     return (
       <>
-        <Header authorized={AUTHORIZED} />
+        <Header />
         <main className={styles.main}>
           <div className={styles.notFound}>
             <h1 className="u-poster">Событие не найдено</h1>
@@ -55,7 +54,7 @@ export default function EventPage() {
 
   const activeSessions = allSessions.filter((s) => s.status === 'active');
   const next = nextOpenSession(activeSessions);
-  const nextView = next ? buildSessionRowView(next, { authorized: AUTHORIZED }) : null;
+  const nextView = next ? buildSessionRowView(next, { authorized }) : null;
 
   const openPrices = activeSessions
     .map((s) => {
@@ -85,7 +84,7 @@ export default function EventPage() {
 
   return (
     <>
-      <Header authorized={AUTHORIZED} />
+      <Header />
       <main className={styles.main}>
         <nav className={styles.breadcrumb} aria-label="Хлебные крошки">
           <Link to="/" className={styles.breadcrumbLink}>
@@ -151,7 +150,7 @@ export default function EventPage() {
 
             <div className={styles.sessionList}>
               {daySessions.map((session) => {
-                const view = buildSessionRowView(session, { authorized: AUTHORIZED });
+                const view = buildSessionRowView(session, { authorized });
                 return (
                   <div key={session.id} className={styles.sessionRow}>
                     <div className={styles.sessionTime}>
@@ -192,7 +191,7 @@ export default function EventPage() {
               })}
             </div>
 
-            {!AUTHORIZED && (
+            {!authorized && (
               <div className={styles.guestBanner}>
                 <span className={styles.guestBannerText}>
                   Схему зала можно посмотреть без входа. Чтобы удержать места и оплатить,
@@ -229,7 +228,7 @@ export default function EventPage() {
               </div>
               <div className={styles.asideActions}>
                 <a href="#sessions" className={styles.asideCta}>
-                  {AUTHORIZED ? 'Выбрать места' : 'Войти и купить'}
+                  {authorized ? 'Выбрать места' : 'Войти и купить'}
                 </a>
                 <button
                   type="button"

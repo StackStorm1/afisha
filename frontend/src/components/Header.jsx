@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useFiltersStore } from '../store/useFiltersStore.js';
 import { useFavorites } from '../store/useFavorites.js';
+import { useAuth } from '../store/useAuth.js';
+import ProfileMenu from './ProfileMenu.jsx';
 import { CATEGORIES } from '../data/categories.js';
 import { getVenueById } from '../data/venues.js';
 import { useDateStrip } from '../lib/useDateStrip.js';
@@ -19,9 +21,10 @@ const TIME_OPTIONS = [
 
 const AGE_OPTIONS = [6, 12, 16, 18];
 
-// Состояние авторизации приходит снаружи — стора авторизации ещё нет,
-// по умолчанию вид гостя.
-export default function Header({ authorized = false }) {
+// variant: 'full' — с поиском и строкой фильтров каталога (главная, событие);
+// 'compact' — без строки фильтров (избранное, заказы): там фильтры ничего
+// не фильтруют.
+export default function Header({ variant = 'full' }) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const blurTimeout = useRef(null);
@@ -37,6 +40,7 @@ export default function Header({ authorized = false }) {
   const toggleAge = useFiltersStore((s) => s.toggleAge);
   const toggleMore = useFiltersStore((s) => s.toggleMore);
 
+  const authStatus = useAuth((s) => s.status);
   const favCount = useFavorites((s) => s.ids.size);
   const dateStrip = useDateStrip();
   const suggestionGroups = useSearchSuggestions(q);
@@ -112,20 +116,21 @@ export default function Header({ authorized = false }) {
         </div>
 
         <div className={styles.actions}>
-          <Link to="/favorites" className={styles.ghostButton}>
-            <span>♡</span> Избранное{' '}
-            {favCount > 0 && <span className={styles.favCount}>{favCount}</span>}
-          </Link>
-          {authorized ? (
+          {authStatus === 'visitor' && (
             <>
-              <Link to="/account/orders" className={styles.ghostButton}>
-                <span>▤</span> Мои заказы
-              </Link>
-              <Link to="/account/orders" className={styles.primaryButton}>
-                Профиль
-              </Link>
+              <NavLink to="/favorites" className={styles.ghostButton}>
+                <span aria-hidden="true">♡</span> Избранное{' '}
+                {favCount > 0 && <span className={styles.favCount}>{favCount}</span>}
+              </NavLink>
+              <NavLink to="/account/orders" className={styles.ghostButton}>
+                <span aria-hidden="true">▤</span> Мои заказы
+              </NavLink>
+              <ProfileMenu />
             </>
-          ) : (
+          )}
+          {/* Пока токен проверяется, кнопки не рисуем: иначе после перезагрузки
+              посетитель на мгновение видел бы «Войти». */}
+          {authStatus === 'guest' && (
             <Link to="/login" className={styles.loginButton}>
               Войти
             </Link>
@@ -133,109 +138,111 @@ export default function Header({ authorized = false }) {
         </div>
       </div>
 
-      <div className={styles.filterBar}>
-        <div className={styles.filterRow}>
-          {TIME_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              className={styles.chip}
-              data-active={time === option.key}
-              onClick={() => toggleTime(option.key)}
-            >
-              {option.label}
-              {time === option.key && <span className={styles.chipClose}>×</span>}
-            </button>
-          ))}
+      {variant === 'full' && (
+        <div className={styles.filterBar}>
+          <div className={styles.filterRow}>
+            {TIME_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={styles.chip}
+                data-active={time === option.key}
+                onClick={() => toggleTime(option.key)}
+              >
+                {option.label}
+                {time === option.key && <span className={styles.chipClose}>×</span>}
+              </button>
+            ))}
 
-          <span className={styles.divider} />
-          <button
-            type="button"
-            className={styles.chip}
-            data-active={priceUnder1500}
-            onClick={togglePrice}
-          >
-            До 1500 ₽{priceUnder1500 && <span className={styles.chipClose}>×</span>}
-          </button>
-
-          <span className={styles.divider} />
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.code}
-              type="button"
-              className={styles.chip}
-              data-active={category === cat.code}
-              onClick={() => toggleCategory(cat.code)}
-            >
-              {cat.name}
-              {category === cat.code && <span className={styles.chipClose}>×</span>}
-            </button>
-          ))}
-
-          {venue && (
+            <span className={styles.divider} />
             <button
               type="button"
               className={styles.chip}
-              data-active="true"
-              onClick={clearVenue}
+              data-active={priceUnder1500}
+              onClick={togglePrice}
             >
-              ◉ {venue.name}
-              <span className={styles.chipClose}>×</span>
+              До 1500 ₽{priceUnder1500 && <span className={styles.chipClose}>×</span>}
             </button>
+
+            <span className={styles.divider} />
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.code}
+                type="button"
+                className={styles.chip}
+                data-active={category === cat.code}
+                onClick={() => toggleCategory(cat.code)}
+              >
+                {cat.name}
+                {category === cat.code && <span className={styles.chipClose}>×</span>}
+              </button>
+            ))}
+
+            {venue && (
+              <button
+                type="button"
+                className={styles.chip}
+                data-active="true"
+                onClick={clearVenue}
+              >
+                ◉ {venue.name}
+                <span className={styles.chipClose}>×</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className={styles.moreButton}
+              data-open={moreOpen}
+              onClick={toggleMore}
+            >
+              Ещё фильтры {age && <span className={styles.favCount}>1</span>}
+            </button>
+          </div>
+
+          {showDateStrip && (
+            <div className={styles.dateStripWrap}>
+              <div className={styles.dateStrip}>
+                {dateStrip.map((d) => (
+                  <button
+                    key={d.iso}
+                    type="button"
+                    className={styles.dateChip}
+                    data-active={d.active}
+                    data-empty={d.count === 0}
+                    onClick={d.pick}
+                  >
+                    <span className={styles.dateDow}>{d.dow}</span>
+                    <span className={styles.dateNum}>{d.num}</span>
+                    <span className={styles.dateCount}>
+                      {d.count > 0 ? pluralizeEvents(d.count) : '—'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
-          <button
-            type="button"
-            className={styles.moreButton}
-            data-open={moreOpen}
-            onClick={toggleMore}
-          >
-            Ещё фильтры {age && <span className={styles.favCount}>1</span>}
-          </button>
+          {moreOpen && (
+            <div className={styles.morePanelWrap}>
+              <div className={styles.morePanel}>
+                <span className={styles.morePanelLabel}>Возраст</span>
+                {AGE_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={styles.chip}
+                    data-active={age === option}
+                    onClick={() => toggleAge(option)}
+                  >
+                    {option}+
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-
-        {showDateStrip && (
-          <div className={styles.dateStripWrap}>
-            <div className={styles.dateStrip}>
-              {dateStrip.map((d) => (
-                <button
-                  key={d.iso}
-                  type="button"
-                  className={styles.dateChip}
-                  data-active={d.active}
-                  data-empty={d.count === 0}
-                  onClick={d.pick}
-                >
-                  <span className={styles.dateDow}>{d.dow}</span>
-                  <span className={styles.dateNum}>{d.num}</span>
-                  <span className={styles.dateCount}>
-                    {d.count > 0 ? pluralizeEvents(d.count) : '—'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {moreOpen && (
-          <div className={styles.morePanelWrap}>
-            <div className={styles.morePanel}>
-              <span className={styles.morePanelLabel}>Возраст</span>
-              {AGE_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={styles.chip}
-                  data-active={age === option}
-                  onClick={() => toggleAge(option)}
-                >
-                  {option}+
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </header>
   );
 }
