@@ -10,6 +10,8 @@ class SessionStatus(StrEnum):
     ACTIVE = "active"
     CANCELLED = "cancelled"
     COMPLETED = "completed"
+
+
 from app.schemas.primitives import Money, Pagination
 from app.schemas.venues import Venue
 

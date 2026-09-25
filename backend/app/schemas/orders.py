@@ -16,6 +16,8 @@ class OrderStatus(StrEnum):
 class PriceCategory(StrEnum):
     STALLS = "stalls"
     BALCONY = "balcony"
+
+
 from app.schemas.primitives import Money, Pagination
 
 
