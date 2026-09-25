@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import MinimalHeader from '../components/MinimalHeader.jsx';
 import Footer from '../components/Footer.jsx';
 import { useAuth } from '../store/useAuth.js';
+import { useFavorites } from '../store/useFavorites.js';
+import { LOGIN_REASONS, returnPath } from '../lib/loginRedirect.js';
 import { EMAIL_PATTERN, PASSWORD_MIN_LENGTH, normalizeEmail } from '../data/auth.js';
 import styles from './AuthPage.module.css';
 
@@ -63,6 +65,9 @@ function fieldErrorsFromServer(error) {
 export default function AuthPage({ mode }) {
   const copy = COPY[mode];
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectState = location.state;
+  const contextLine = LOGIN_REASONS[redirectState?.reason];
   const status = useAuth((s) => s.status);
   const submit = useAuth((s) => (mode === 'login' ? s.login : s.register));
 
@@ -71,7 +76,9 @@ export default function AuthPage({ mode }) {
   const [formError, setFormError] = useState('');
   const [pending, setPending] = useState(false);
 
-  if (status === 'visitor' && !pending) return <Navigate to="/" replace />;
+  if (status === 'visitor' && !pending) {
+    return <Navigate to={returnPath(redirectState)} replace />;
+  }
 
   function change(field) {
     return (e) => {
@@ -92,7 +99,11 @@ export default function AuthPage({ mode }) {
     setPending(true);
     try {
       await submit({ email: values.email, password: values.password });
-      navigate('/', { replace: true });
+      if (redirectState?.favoriteEventId) {
+        useFavorites.getState().add(redirectState.favoriteEventId);
+      }
+      // replace: «Назад» после входа не должна возвращать на форму.
+      navigate(returnPath(redirectState), { replace: true });
     } catch (error) {
       const serverFieldErrors = fieldErrorsFromServer(error);
       if (serverFieldErrors) setFieldErrors(serverFieldErrors);
@@ -106,6 +117,14 @@ export default function AuthPage({ mode }) {
       <MinimalHeader />
       <main className={styles.main}>
         <form className={styles.card} onSubmit={onSubmit} noValidate>
+          {contextLine && (
+            <div className={styles.context}>
+              <span className={styles.contextDot} aria-hidden="true">
+                ◉
+              </span>
+              {contextLine}
+            </div>
+          )}
           <h1 className={styles.title}>{copy.title}</h1>
 
           <div className={styles.fields}>
@@ -144,7 +163,14 @@ export default function AuthPage({ mode }) {
 
           <div className={styles.switchRow}>
             <span>{copy.switchQuestion}</span>
-            <Link to={copy.switchTo} className={styles.switchLink} replace>
+            {/* state переносится: переключение «вход ↔ регистрация» не должно
+                терять, куда вернуть пользователя и зачем его сюда привели. */}
+            <Link
+              to={copy.switchTo}
+              state={redirectState}
+              className={styles.switchLink}
+              replace
+            >
               {copy.switchAction}
             </Link>
           </div>

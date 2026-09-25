@@ -1,11 +1,10 @@
 import { Link } from 'react-router-dom';
 import PosterImage from './PosterImage.jsx';
-import { useFavorites } from '../store/useFavorites.js';
+import { useFavoriteToggle } from '../lib/useFavoriteToggle.js';
 import styles from './EventCard.module.css';
 
 export default function EventCard({ event }) {
-  const isFavorite = useFavorites((s) => s.isFavorite(event.id));
-  const toggleFavorite = useFavorites((s) => s.toggle);
+  const { isFavorite, toggle: toggleFavorite } = useFavoriteToggle(event.id);
   const showBadge = !event.sold && Boolean(event.badge);
   const href = `/events/${event.id}`;
 
@@ -30,7 +29,7 @@ export default function EventCard({ event }) {
           data-active={isFavorite}
           aria-pressed={isFavorite}
           aria-label={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
-          onClick={() => toggleFavorite(event.id)}
+          onClick={toggleFavorite}
         >
           {isFavorite ? '♥' : '♡'}
         </button>

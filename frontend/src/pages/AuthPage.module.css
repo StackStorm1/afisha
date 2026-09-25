@@ -18,6 +18,24 @@
   gap: 28px;
 }
 
+.context {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 20px;
+  margin-bottom: -8px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--color-ink);
+}
+
+.contextDot {
+  flex: none;
+  color: var(--color-link);
+  font-size: 13px;
+}
+
 .title {
   font-family: var(--font-display);
   font-weight: 400;

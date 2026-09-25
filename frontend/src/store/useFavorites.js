@@ -6,6 +6,12 @@ import { create } from 'zustand';
 export const useFavorites = create((set, get) => ({
   ids: new Set(),
   isFavorite: (eventId) => get().ids.has(eventId),
+  // Завершение прерванного действия после входа: событие должно оказаться
+  // в избранном, даже если гость нажимал сердечко несколько раз.
+  add: (eventId) =>
+    set((state) =>
+      state.ids.has(eventId) ? state : { ids: new Set(state.ids).add(eventId) }
+    ),
   toggle: (eventId) =>
     set((state) => {
       const ids = new Set(state.ids);
