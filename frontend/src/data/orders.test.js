@@ -7,6 +7,8 @@ import {
   cancelOrder,
   listMyOrders,
   getOrder,
+  expireStaleOrders,
+  startExpirySweep,
   MAX_SEATS_PER_ORDER,
 } from './orders.js';
 import { expectOrderDetail, expectPagination } from './schemaAssertions.js';
@@ -276,5 +278,104 @@ describe('orders mock — отмена и список заказов (US-15, US
       expectOrderDetail(o);
       expect(o.status).toBe('pending');
     }
+  });
+});
+
+describe('orders mock — фоновое истечение броней (BR-02, requirements.md §7)', () => {
+  it('протухшая неоплаченная бронь освобождается без вызова оплаты', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+
+    // Ключевое отличие от прежнего поведения: payOrder не вызываем вовсе —
+    // раньше без него места оставались 'held'.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(order.expires_at).getTime() + 1000);
+    const expired = expireStaleOrders();
+    vi.useRealTimers();
+
+    expect(expired.map((o) => o.id)).toContain(order.id);
+    expect(getOrder(order.id).status).toBe('cancelled');
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+  });
+
+  it('свежая бронь (срок не вышел) остаётся held и pending', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+
+    const expired = expireStaleOrders(); // now < expires_at
+    expect(expired.map((o) => o.id)).not.toContain(order.id);
+    expect(getOrder(order.id).status).toBe('pending');
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('held');
+  });
+
+  it('оплаченную бронь развёртка не трогает', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    payOrder(order.id, { outcome: 'success' });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 60 * 60 * 1000);
+    expireStaleOrders();
+    vi.useRealTimers();
+
+    expect(getOrder(order.id).status).toBe('paid');
+  });
+
+  // После неуспешной оплаты место держится до expires_at (US-16). По истечении
+  // его тоже обязана освободить фоновая задача, а не только повтор оплаты.
+  it('бронь после неуспешной оплаты освобождается по истечении (US-16)', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+    expect(() => payOrder(order.id, { outcome: 'fail' })).toThrow();
+    expect(getOrder(order.id).status).toBe('failed');
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(order.expires_at).getTime() + 1000);
+    expireStaleOrders();
+    vi.useRealTimers();
+
+    expect(getOrder(order.id).status).toBe('cancelled');
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
+  });
+
+  it('startExpirySweep гоняет цикл раз в минуту и освобождает места сам', () => {
+    const { session, freeSeats } = freeSession();
+    const seatId = freeSeats[0].id;
+
+    vi.useFakeTimers();
+    const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
+    const onExpire = vi.fn();
+    const stop = startExpirySweep(onExpire);
+
+    // Тик до истечения — ничего не трогает.
+    vi.advanceTimersByTime(60 * 1000);
+    expect(getOrder(order.id).status).toBe('pending');
+    expect(onExpire).not.toHaveBeenCalled();
+
+    // Переваливаем за срок удержания и ждём следующий тик.
+    vi.setSystemTime(new Date(order.expires_at).getTime() + 1000);
+    vi.advanceTimersByTime(60 * 1000);
+
+    stop();
+    vi.useRealTimers();
+
+    expect(getOrder(order.id).status).toBe('cancelled');
+    expect(onExpire).toHaveBeenCalled();
+    const seat = getSeatMap(session.id)
+      .rows.flatMap((row) => row.seats)
+      .find((s) => s.id === seatId);
+    expect(seat.status).toBe('free');
   });
 });
