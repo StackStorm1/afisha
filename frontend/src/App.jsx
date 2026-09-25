@@ -1,6 +1,7 @@
 import { Routes, Route, useParams } from 'react-router-dom';
 import HomePage from './pages/HomePage.jsx';
 import EventPage from './pages/EventPage.jsx';
+import AuthPage from './pages/AuthPage.jsx';
 
 // key={eventId}: без него React Router переиспользует тот же экземпляр
 // EventPage при переходе между двумя событиями (например, по клику на
@@ -17,6 +18,8 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/events/:eventId" element={<EventPageRoute />} />
+      <Route path="/login" element={<AuthPage key="login" mode="login" />} />
+      <Route path="/register" element={<AuthPage key="register" mode="register" />} />
     </Routes>
   );
 }

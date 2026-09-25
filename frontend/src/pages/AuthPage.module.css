@@ -1,0 +1,139 @@
+.main {
+  min-height: 700px;
+  padding: 72px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.input {
+  height: 48px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.14s;
+}
+
+.input::placeholder {
+  color: var(--color-ink-weak);
+}
+
+.input:focus-visible {
+  border-color: var(--color-link);
+}
+
+.input[data-invalid='true'] {
+  border-color: var(--color-status-error);
+}
+
+.fieldError {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-status-error);
+}
+
+.submitBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.formError {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-status-error);
+}
+
+.cta {
+  height: 52px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.cta:hover {
+  background: var(--color-accent-hover);
+}
+
+.cta:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.switchRow {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--color-ink-secondary);
+}
+
+.switchLink {
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .main {
+    min-height: 0;
+    padding: 40px 16px;
+  }
+
+  .card {
+    padding: 28px 20px;
+  }
+}

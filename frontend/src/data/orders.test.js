@@ -282,7 +282,7 @@ describe('orders mock — отмена и список заказов (US-15, US
 });
 
 describe('orders mock — фоновое истечение броней (BR-02, requirements.md §7)', () => {
-  it('протухшая неоплаченная бронь освобождается без вызова оплаты', () => {
+  it('истёкшая неоплаченная бронь освобождается без вызова оплаты', () => {
     const { session, freeSeats } = freeSession();
     const seatId = freeSeats[0].id;
     const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
