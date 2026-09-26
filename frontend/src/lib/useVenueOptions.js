@@ -3,9 +3,9 @@ import { VENUES } from '../data/venues.js';
 import { listEvents, listEventSessions } from '../data/events.js';
 import { useFiltersStore } from '../store/useFiltersStore.js';
 
-// Тайлы площадок — быстрый фильтр по каталогу, не переход на отдельную
-// страницу площадки (её нет в MVP).
-export function useVenueTiles() {
+// Площадки для фильтра: название + сколько событий на площадке. Фильтрует
+// каталог, а не ведёт на страницу площадки (её нет в MVP).
+export function useVenueOptions() {
   const venueId = useFiltersStore((s) => s.venueId);
   const toggleVenue = useFiltersStore((s) => s.toggleVenue);
 

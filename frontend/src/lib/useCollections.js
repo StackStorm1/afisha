@@ -26,6 +26,7 @@ export function useCollections() {
   return useMemo(() => {
     const weekend = timeToDateRange('weekend', null);
     const week = timeToDateRange('week', null);
+    const hasPriceFilter = state.priceMin !== null || state.priceMax !== null;
 
     const defs = [
       {
@@ -33,7 +34,7 @@ export function useCollections() {
         title: 'Куда пойти в выходные',
         rule: 'дата: выходные',
         patch: { time: 'weekend' },
-        active: state.time === 'weekend' && !state.category && !state.priceUnder1500,
+        active: state.time === 'weekend' && !state.category && !hasPriceFilter,
         count: listEvents({
           date_from: weekend.date_from,
           date_to: weekend.date_to,
@@ -44,8 +45,12 @@ export function useCollections() {
         key: 'cheap',
         title: 'Дешевле 1 500 ₽',
         rule: 'цена: до 1 500 ₽',
-        patch: { priceUnder1500: true },
-        active: state.priceUnder1500 && !state.category && !state.time,
+        patch: { priceMax: 1500 },
+        active:
+          state.priceMax === 1500 &&
+          state.priceMin === null &&
+          !state.category &&
+          !state.time,
         count: countUnderPrice(1500),
       },
       {
@@ -78,5 +83,5 @@ export function useCollections() {
 
     return defs.map((def) => ({ ...def, pick: () => applyPreset(def.patch) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.time, state.category, state.priceUnder1500, applyPreset]);
+  }, [state.time, state.category, state.priceMin, state.priceMax, applyPreset]);
 }

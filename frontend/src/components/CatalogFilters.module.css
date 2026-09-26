@@ -1,0 +1,222 @@
+.filterBar {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.filterRow {
+  max-width: var(--grid-max-width);
+  margin: 0 auto;
+  padding: 12px 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.chip {
+  height: 36px;
+  padding: 0 15px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.14s;
+}
+
+.chip[data-active='true'] {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.chipClose {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.moreButton {
+  height: 36px;
+  padding: 0 15px;
+  margin-left: auto;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.14s;
+}
+
+.moreButton[data-open='true'] {
+  background: var(--color-surface-hover);
+}
+
+.dateStripWrap {
+  max-width: var(--grid-max-width);
+  margin: 0 auto;
+  padding: 0 40px 14px;
+}
+
+.dateStrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.dateStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.dateChip {
+  flex: none;
+  width: 66px;
+  height: 74px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  transition: background 0.14s;
+}
+
+.dateChip[data-active='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.dateChip[data-empty='true'] {
+  color: var(--color-ink-weak);
+}
+
+.dateDow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.dateChip[data-active='true'] .dateDow {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dateNumRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.dateNum {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Месяц — на первом чипе и при смене месяца, см. lib/dateStrip.js. */
+.dateMonth {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-ink-muted);
+}
+
+.dateChip[data-active='true'] .dateMonth {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dateCount {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-ink-muted);
+}
+
+.dateChip[data-active='true'] .dateCount {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.morePanelWrap {
+  max-width: var(--grid-max-width);
+  margin: 0 auto;
+  padding: 0 40px 16px;
+}
+
+.morePanel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.morePanelRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.morePanelLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  width: 120px;
+  flex: none;
+}
+
+/* Счётчик активных фильтров в кнопке «Ещё фильтры». */
+.counter {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-link);
+}
+
+/* Брейкпоинт и боковой отступ (40px) — как у остальной сетки. */
+@media (max-width: 600px) {
+  .filterRow {
+    gap: 8px;
+  }
+
+  /* Вертикальные разделители теряют смысл, когда чипы переносятся по строкам. */
+  .divider {
+    display: none;
+  }
+
+  /* «Ещё фильтры» больше не отжимается в правый край — встаёт в общий поток. */
+  .moreButton {
+    margin-left: 0;
+  }
+
+  /* Метки групп встают над кнопками, а не фиксированной колонкой в 120px. */
+  .morePanelLabel {
+    width: 100%;
+  }
+}
