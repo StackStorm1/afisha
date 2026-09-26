@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -102,7 +102,7 @@ async def make_session(
     base_price: Decimal = Decimal("500.00"),
 ) -> Session:
     if starts_at is None:
-        starts_at = datetime.now(timezone.utc) + timedelta(days=7)
+        starts_at = datetime.now(UTC) + timedelta(days=7)
     db_session = Session(
         event_id=event.id,
         venue_id=venue.id,
