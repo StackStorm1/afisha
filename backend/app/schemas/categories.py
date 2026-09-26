@@ -1,0 +1,20 @@
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.enums import CategoryCode
+
+
+class Category(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(..., examples=[1])
+    code: CategoryCode = Field(
+        ...,
+        description="Стабильный идентификатор категории для логики приложения. В БД хранится в верхнем регистре (`THEATRE`), в API отдаётся в нижнем.",
+        examples=["theatre"],
+    )
+    name: str = Field(..., max_length=100, examples=["Театр"])
+    slug: str = Field(..., max_length=100, examples=["theatre"])
+
+
+class CategoryListResponse(BaseModel):
+    data: list[Category]
