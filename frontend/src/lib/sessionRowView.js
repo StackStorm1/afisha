@@ -1,5 +1,5 @@
 import { getSessionZones, ZONE_LABELS } from './cardBadge.js';
-import { formatPrice, formatTime } from './format.js';
+import { formatPrice, formatTime, pluralizeSeats } from './format.js';
 
 const LEFT_WARNING_THRESHOLD = 20;
 
@@ -43,13 +43,13 @@ export function buildSessionRowView(session, { authorized }) {
       .join(' · ');
   }
 
-  let leftLabel = `Свободно ${left} мест`;
+  let leftLabel = `Свободно ${pluralizeSeats(left)}`;
   let leftTone = 'muted';
   if (sold) {
     leftLabel = 'Все места заняты';
     leftTone = 'error';
   } else if (left <= LEFT_WARNING_THRESHOLD) {
-    leftLabel = `Свободно ${left} мест — почти разобрали`;
+    leftLabel = `Свободно ${pluralizeSeats(left)} — почти разобрали`;
     leftTone = 'warning';
   }
 

@@ -52,7 +52,9 @@ export default function Hero() {
             className={styles.sideCard}
           >
             <PosterImage src={card.posterUrl} alt="" />
-            <span className={styles.sideBadge}>{formatTime(card.startsAt)}</span>
+            <span className={styles.sideBadge}>
+              {card.slotLabel} · {formatTime(card.startsAt)}
+            </span>
             <div className={styles.sideGradient} />
             <div className={styles.sideText}>
               <span className={styles.sideTitle}>{card.title}</span>

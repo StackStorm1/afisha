@@ -13,6 +13,8 @@ import {
   formatDuration,
   formatPrice,
   formatSessionWhen,
+  pluralizeRows,
+  pluralizeSeats,
   pluralizeSessions,
 } from '../lib/format.js';
 import styles from './EventPage.module.css';
@@ -128,7 +130,7 @@ export default function EventPage() {
             <h2 className={styles.sectionTitle}>Сеансы</h2>
             <div className={styles.sectionSubtitle}>
               Выберите дату — ниже покажем показы этого дня с ценой и числом свободных
-              мест.
+              мест. В ленте только дни, в которые у события есть сеансы.
             </div>
 
             <div className={styles.dateStrip}>
@@ -138,12 +140,16 @@ export default function EventPage() {
                   type="button"
                   className={styles.dateChip}
                   data-active={day.active}
-                  data-empty={!day.hasSessions}
-                  disabled={!day.hasSessions}
+                  data-empty={day.soldOut}
                   onClick={() => setSelectedDay(day.iso)}
                 >
                   <span className={styles.dateDow}>{day.dow}</span>
-                  <span className={styles.dateNum}>{day.num}</span>
+                  <span className={styles.dateNumRow}>
+                    <span className={styles.dateNum}>{day.num}</span>
+                    {day.showMonth && (
+                      <span className={styles.dateMonth}>{day.month}</span>
+                    )}
+                  </span>
                   <span className={styles.dateSub}>{day.label}</span>
                 </button>
               ))}
@@ -303,7 +309,8 @@ export default function EventPage() {
               </span>
               <div className={styles.asideDivider} />
               <span className={styles.venueCardAddress}>
-                Зал: {venue.rows_count} рядов по {venue.seats_per_row} мест. Ряды 1–
+                Зал: {pluralizeRows(venue.rows_count)} по{' '}
+                {pluralizeSeats(venue.seats_per_row)}. Ряды 1–
                 {balconyStartRow - 1} — партер, {balconyStartRow}–{venue.rows_count} —
                 балкон.
               </span>

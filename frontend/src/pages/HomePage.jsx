@@ -3,7 +3,6 @@ import Hero from '../components/Hero.jsx';
 import EventFeed from '../components/EventFeed.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import Collections from '../components/Collections.jsx';
-import VenueTiles from '../components/VenueTiles.jsx';
 import Footer from '../components/Footer.jsx';
 import { useFilterUrl } from '../lib/useFilterUrl.js';
 import { useCatalogFeed } from '../lib/useCatalogFeed.js';
@@ -17,7 +16,7 @@ export default function HomePage() {
 
   return (
     <>
-      <Header />
+      <Header showFilters />
       <main className={styles.main}>
         <Hero />
         <section id="feed" className={styles.feedSection}>
@@ -35,7 +34,6 @@ export default function HomePage() {
           )}
         </section>
         <Collections />
-        <VenueTiles />
       </main>
       <Footer />
     </>
