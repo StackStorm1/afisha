@@ -27,7 +27,10 @@ async def register(db: AsyncSession, email: str, password: str) -> AuthResponseD
         token=token,
         expires_in=expires_in,
         user=UserProfile(
-            id=user.id, email=user.email, role=user.role.lower(), created_at=user.created_at
+            id=user.id,
+            email=user.email,
+            role=user.role.lower(),
+            created_at=user.created_at,
         ),
     )
 
@@ -48,6 +51,9 @@ async def login(db: AsyncSession, email: str, password: str) -> AuthResponseData
         token=token,
         expires_in=expires_in,
         user=UserProfile(
-            id=user.id, email=user.email, role=user.role.lower(), created_at=user.created_at
+            id=user.id,
+            email=user.email,
+            role=user.role.lower(),
+            created_at=user.created_at,
         ),
     )
