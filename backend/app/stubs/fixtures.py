@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from app.enums import SeatStatus, UserRole
-from app.schemas.auth import AuthResponse, AuthResponseData, UserProfile
+from app.enums import SeatStatus
+from app.schemas.auth import AuthResponse, AuthResponseData, UserProfile, UserRole
 from app.schemas.categories import Category, CategoryCode
 from app.schemas.cities import City
 from app.schemas.events import AgeRating, EventBase, EventDetail, EventSummary
