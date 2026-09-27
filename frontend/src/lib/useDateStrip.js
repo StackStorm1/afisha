@@ -1,18 +1,14 @@
 import { useMemo } from 'react';
 import { listEvents, listEventSessions } from '../data/events.js';
 import { useFiltersStore } from '../store/useFiltersStore.js';
+import { addDaysIso, describeDay, isoRange, todayIso } from './dateStrip.js';
 
-const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-const DAYS_AHEAD = 14;
-const DAY_MS = 24 * 60 * 60 * 1000;
+const MIN_DAYS_AHEAD = 14;
 
-function toDateOnly(date) {
-  return date.toISOString().slice(0, 10);
-}
-
-// 14-дневная лента дат под фильтрами. Счётчик по дню считается по всем
-// событиям, независимо от остальных активных фильтров, чтобы пользователь
-// видел, где вообще что-то есть.
+// Лента дат под фильтрами. Счётчик по дню считается по всем событиям,
+// независимо от остальных активных фильтров, чтобы пользователь видел, где
+// вообще что-то есть. Горизонт — до последнего дня с активным сеансом:
+// фиксированное окно в 14 дней не давало выбрать дату дальше.
 export function useDateStrip() {
   const day = useFiltersStore((s) => s.day);
   const setDay = useFiltersStore((s) => s.setDay);
@@ -29,15 +25,15 @@ export function useDateStrip() {
       for (const date of dates) countsByDate.set(date, (countsByDate.get(date) ?? 0) + 1);
     }
 
-    const today = new Date(new Date().toISOString().slice(0, 10));
-    return Array.from({ length: DAYS_AHEAD }, (_, i) => {
-      const date = new Date(today.getTime() + i * DAY_MS);
-      const iso = toDateOnly(date);
+    const today = todayIso();
+    const lastSessionDate = [...countsByDate.keys()].sort().at(-1) ?? today;
+    const minLastDate = addDaysIso(today, MIN_DAYS_AHEAD - 1);
+    const until = lastSessionDate > minLastDate ? lastSessionDate : minLastDate;
+
+    return isoRange(today, until).map((iso, index, all) => {
       const count = countsByDate.get(iso) ?? 0;
       return {
-        iso,
-        num: date.getUTCDate(),
-        dow: WEEKDAYS[date.getUTCDay()],
+        ...describeDay(iso, index > 0 ? all[index - 1] : null),
         count,
         active: day === iso,
         pick: () => setDay(iso),

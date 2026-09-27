@@ -180,11 +180,6 @@
 .dateChip[data-empty='true'] {
   background: transparent;
   color: var(--color-ink-weak);
-  cursor: default;
-}
-
-.dateChip:disabled {
-  cursor: default;
 }
 
 .dateDow {
@@ -199,10 +194,28 @@
   color: rgba(255, 255, 255, 0.78);
 }
 
+.dateNumRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
 .dateNum {
   font-family: var(--font-display);
   font-size: 22px;
   line-height: 1;
+}
+
+/* Соседние чипы могут быть из разных месяцев: в ленте только дни с сеансами. */
+.dateMonth {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-ink-muted);
+}
+
+.dateChip[data-active='true'] .dateMonth {
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .dateSub {

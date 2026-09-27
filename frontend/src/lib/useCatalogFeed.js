@@ -9,11 +9,23 @@ const LATER_THRESHOLD_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Строит карточки каталога: событие + ближайший подходящий под фильтры
-// сеанс. Фильтры категории/дат/поиска идут через мок GET /events (совпадает
-// с формой контракта), венью/цена/возраст — фильтры, которых нет в
-// openapi.yaml, поэтому применяются здесь же, на уже отфильтрованном наборе.
+// сеанс. Фильтры категории/дат/поиска и сортировка идут через мок GET /events
+// (совпадает с формой контракта), венью/цена/возраст/наличие мест — фильтры,
+// которых нет в openapi.yaml, поэтому применяются здесь же, на уже
+// отфильтрованном наборе.
 export function useCatalogFeed() {
-  const { q, time, day, priceUnder1500, category, venueId, age } = useFiltersStore();
+  const {
+    q,
+    time,
+    day,
+    priceMin,
+    priceMax,
+    onlyAvailable,
+    sort,
+    category,
+    venueId,
+    age,
+  } = useFiltersStore();
   const { date_from, date_to } = timeToDateRange(time, day);
 
   return useMemo(() => {
@@ -22,6 +34,7 @@ export function useCatalogFeed() {
       date_from,
       date_to,
       category,
+      sort,
       per_page: 500,
     });
 
@@ -39,9 +52,15 @@ export function useCatalogFeed() {
       cards.push(buildEventCard(event, candidates[0]));
     }
 
-    const filteredByPrice = priceUnder1500
-      ? cards.filter((card) => !card.sold && card.minAvailable <= 1500)
-      : cards;
+    // У распроданной карточки нет доступной цены — под заданную границу она
+    // не подходит ни с одной стороны.
+    const hasPriceBound = priceMin !== null || priceMax !== null;
+    const visibleCards = cards.filter((card) => {
+      if ((onlyAvailable || hasPriceBound) && card.sold) return false;
+      if (priceMin !== null && card.minAvailable < priceMin) return false;
+      if (priceMax !== null && card.minAvailable > priceMax) return false;
+      return true;
+    });
 
     const today = new Date(new Date().toISOString().slice(0, 10));
     const laterCutoff = new Date(today.getTime() + LATER_THRESHOLD_DAYS * DAY_MS);
@@ -74,9 +93,25 @@ export function useCatalogFeed() {
       },
     ];
 
-    const rows = rowDefs
-      .map((row) => ({ ...row, items: filteredByPrice.filter(row.match) }))
-      .filter((row) => row.items.length > 0);
+    const thematicRows = rowDefs.map((row) => ({
+      ...row,
+      items: visibleCards.filter(row.match),
+    }));
+
+    // Тематические полки покрывают не весь набор, поэтому остаток забирает
+    // замыкающая полка: иначе «N событий» не совпадает с содержимым ленты.
+    const covered = new Set(thematicRows.flatMap((row) => row.items.map((i) => i.id)));
+    const rest = visibleCards.filter((card) => !covered.has(card.id));
+
+    const rows = [
+      ...thematicRows,
+      {
+        key: 'rest',
+        title: 'Ещё в афише',
+        why: 'Подходят под фильтры, но не попали в полки выше',
+        items: rest,
+      },
+    ].filter((row) => row.items.length > 0);
 
     const weekend = timeToDateRange('weekend', null);
     const { data: weekendEvents } = listEvents({
@@ -97,7 +132,18 @@ export function useCatalogFeed() {
       rows,
       isEmpty: rows.length === 0,
       alternatives,
-      total: filteredByPrice.length,
+      total: visibleCards.length,
     };
-  }, [q, priceUnder1500, category, venueId, age, date_from, date_to]);
+  }, [
+    q,
+    priceMin,
+    priceMax,
+    onlyAvailable,
+    sort,
+    category,
+    venueId,
+    age,
+    date_from,
+    date_to,
+  ]);
 }

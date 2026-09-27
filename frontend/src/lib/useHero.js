@@ -27,9 +27,14 @@ export function useHero() {
     const byUrgency = [...cards].filter((c) => !c.sold).sort((a, b) => a.left - b.left);
     const featured = byUrgency[0] ?? cards[0] ?? null;
 
+    // Без верхней границы в слот «Сегодня» попадал первый же будущий сеанс —
+    // вплоть до события через месяц. Нет сеансов сегодня — слот пуст.
     const todayCard = cards.find(
       (c) =>
-        !c.sold && c.id !== featured?.id && c.startsAt >= `${today.date_from}T00:00:00Z`
+        !c.sold &&
+        c.id !== featured?.id &&
+        c.startsAt >= `${today.date_from}T00:00:00Z` &&
+        c.startsAt <= `${today.date_to}T23:59:59Z`
     );
     const weekendCard = cards.find(
       (c) =>
@@ -40,6 +45,13 @@ export function useHero() {
         c.startsAt <= `${weekend.date_to}T23:59:59Z`
     );
 
-    return { featured, side: [todayCard, weekendCard].filter(Boolean) };
+    // slotLabel — подпись слота на бейдже: рядом с одним временем «19:00»
+    // иначе непонятно, сегодняшний это показ или выходной.
+    const side = [
+      todayCard ? { ...todayCard, slotLabel: 'Сегодня' } : null,
+      weekendCard ? { ...weekendCard, slotLabel: 'Выходные' } : null,
+    ].filter(Boolean);
+
+    return { featured, side };
   }, []);
 }

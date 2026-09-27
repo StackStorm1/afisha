@@ -1,0 +1,230 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Тот же чип, что и остальные в строке фильтров (Header.module.css .chip). */
+.chip {
+  height: 36px;
+  padding: 0 15px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: background 0.14s;
+}
+
+.chip:hover {
+  background: var(--color-surface-hover);
+}
+
+.chip[data-active='true'] {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.caret {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.panel {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  z-index: 40;
+  min-width: 260px;
+  max-width: min(360px, calc(100vw - 32px));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-control);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.6);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* У правого края строки фильтров панель с left: 0 вылезает за вьюпорт. */
+@media (max-width: 600px) {
+  .panel {
+    left: auto;
+    right: 0;
+  }
+}
+
+/* --- Содержимое панелей (цена, площадка) --- */
+
+.panelLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.panelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.field {
+  flex: 1;
+  min-width: 96px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-control);
+  background: var(--color-bg);
+}
+
+.fieldPrefix {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  flex: none;
+}
+
+.fieldInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.fieldInput::-webkit-outer-spin-button,
+.fieldInput::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.fieldInput[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.preset {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.preset:hover {
+  background: var(--color-surface-hover);
+}
+
+.preset[data-active='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.option:hover {
+  background: var(--color-surface-hover);
+}
+
+.option[data-active='true'] {
+  background: var(--color-surface-hover);
+  color: var(--color-link);
+}
+
+.optionName {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.optionMeta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  flex: none;
+}
+
+.panelFooter {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.resetButton {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.resetButton:hover {
+  background: var(--color-surface-hover);
+}
+
+.resetButton:disabled {
+  color: var(--color-ink-weak);
+  cursor: default;
+}
+
+.resetButton:disabled:hover {
+  background: transparent;
+}
