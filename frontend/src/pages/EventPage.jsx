@@ -233,18 +233,12 @@ export default function EventPage() {
                 </span>
               </div>
               <div className={styles.asideActions}>
-                {authorized ? (
-                  <a href="#sessions" className={styles.asideCta}>
-                    Выбрать места
-                  </a>
-                ) : (
-                  <Link
-                    to={`/events/${event.id}/sessions/${next.id}/seats`}
-                    className={styles.asideCta}
-                  >
-                    Войти и купить
-                  </Link>
-                )}
+                <Link
+                  to={`/events/${event.id}/sessions/${next.id}/seats`}
+                  className={styles.asideCta}
+                >
+                  {authorized ? 'Выбрать места' : 'Войти и купить'}
+                </Link>
                 <button
                   type="button"
                   className={styles.asideFavorite}
