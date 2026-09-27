@@ -1,6 +1,7 @@
 import { uuid } from '../lib/uuid.js';
 import { toMoney } from '../lib/money.js';
-import { getEventBySessionId, getSession } from './events.js';
+import { getEventBySessionId, getSession, listEvents } from './events.js';
+import { VENUES } from './venues.js';
 import { findSeat, getSeatMap } from './seatMap.js';
 
 const HOLD_MINUTES = 15; // BR-02
@@ -304,6 +305,149 @@ export function stopExpirySweep() {
   if (sweepTimer == null) return;
   clearInterval(sweepTimer);
   sweepTimer = null;
+}
+
+// --- Демо-заказы для личного кабинета (US-15) ---
+// Реальных заказов на моках обычно нет (их создаёт только оформление брони в
+// текущей вкладке), поэтому кабинет заполняется детерминированным набором:
+// разные статусы и разные даты сеансов — будущие («Предстоящие») и прошедшие
+// («Прошедшие»). Повторный вызов ничего не дублирует.
+
+let demoSeeded = false;
+
+function demoIso(days, hour) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + days);
+  d.setUTCHours(hour, 0, 0, 0);
+  return d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function buildDemoOrder({
+  event,
+  venue,
+  startsInDays,
+  hour,
+  price,
+  seats,
+  status,
+  createdDaysAgo,
+}) {
+  const held = status === 'pending' || status === 'failed';
+  const bookedSeats = seats.map(([rowNo, seatNo]) => ({
+    id: uuid(),
+    row_no: rowNo,
+    seat_no: seatNo,
+    price_category: 'stalls',
+    price: toMoney(price),
+  }));
+  return {
+    id: uuid(),
+    session: {
+      id: uuid(),
+      event: { id: event.id, title: event.title, poster_url: event.poster_url },
+      venue: { name: venue.name, address: venue.address, city: venue.city },
+      starts_at: demoIso(startsInDays, hour),
+      price: toMoney(price),
+    },
+    seats: bookedSeats,
+    total_price: toMoney(price * bookedSeats.length),
+    status,
+    // Демо-удержание продлено, чтобы фоновая развёртка не отменяла
+    // pending/failed заказы прямо в открытом кабинете.
+    expires_at: held ? demoIso(2, hour) : null,
+    created_at: demoIso(-Math.abs(createdDaysAgo), hour),
+    updated_at: demoIso(-Math.abs(createdDaysAgo), hour),
+  };
+}
+
+export function seedDemoOrders() {
+  if (demoSeeded) return;
+  demoSeeded = true;
+
+  const events = listEvents({ per_page: 20 }).data;
+  if (events.length === 0) return;
+  const at = (i) => events[i % events.length];
+
+  const demos = [
+    {
+      event: at(0),
+      venue: VENUES[0],
+      startsInDays: 5,
+      hour: 19,
+      price: 3200,
+      seats: [
+        [5, 12],
+        [5, 13],
+      ],
+      status: 'paid',
+      createdDaysAgo: 3,
+    },
+    {
+      event: at(1),
+      venue: VENUES[2],
+      startsInDays: 12,
+      hour: 20,
+      price: 1800,
+      seats: [[3, 7]],
+      status: 'pending',
+      createdDaysAgo: 0,
+    },
+    {
+      event: at(2),
+      venue: VENUES[4],
+      startsInDays: 21,
+      hour: 18,
+      price: 4500,
+      seats: [
+        [8, 1],
+        [8, 2],
+        [8, 3],
+      ],
+      status: 'paid',
+      createdDaysAgo: 1,
+    },
+    {
+      event: at(3),
+      venue: VENUES[3],
+      startsInDays: 8,
+      hour: 21,
+      price: 1200,
+      seats: [
+        [2, 5],
+        [2, 6],
+      ],
+      status: 'failed',
+      createdDaysAgo: 0,
+    },
+    {
+      event: at(4),
+      venue: VENUES[1],
+      startsInDays: -10,
+      hour: 19,
+      price: 2600,
+      seats: [
+        [6, 15],
+        [6, 16],
+      ],
+      status: 'paid',
+      createdDaysAgo: 20,
+    },
+    {
+      event: at(5),
+      venue: VENUES[5],
+      startsInDays: -3,
+      hour: 20,
+      price: 2000,
+      seats: [[4, 9]],
+      status: 'cancelled',
+      createdDaysAgo: 7,
+    },
+  ];
+
+  for (const spec of demos) {
+    const order = buildDemoOrder(spec);
+    ordersById.set(order.id, order);
+  }
 }
 
 export function __seedOrder(order) {

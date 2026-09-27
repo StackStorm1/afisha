@@ -1,0 +1,98 @@
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.trigger {
+  height: 44px;
+  max-width: 220px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  transition: background 0.14s;
+}
+
+.trigger:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.avatar {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.email {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Отступ сверху не оставляет разрыва между кнопкой и меню — курсор не теряет
+   наведение, проходя от триггера к пунктам. */
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  padding-top: 8px;
+  display: none;
+  z-index: 40;
+}
+
+.wrap:hover .menu,
+.wrap:focus-within .menu {
+  display: block;
+}
+
+.menuInner {
+  min-width: 190px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-control);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.12s;
+}
+
+.item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+@media (max-width: 600px) {
+  .trigger {
+    max-width: 150px;
+  }
+}

@@ -1,16 +1,18 @@
 import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useFiltersStore } from '../store/useFiltersStore.js';
 import { useFavorites } from '../store/useFavorites.js';
+import { useAuth } from '../store/useAuth.js';
 import { useSearchSuggestions } from '../lib/useSearchSuggestions.js';
 import CatalogFilters from './CatalogFilters.jsx';
+import AccountMenu from './AccountMenu.jsx';
 import styles from './Header.module.css';
 
-// Состояние авторизации приходит снаружи — стора авторизации ещё нет,
-// по умолчанию вид гостя. showFilters включается только на страницах с лентой
-// каталога: панель фильтров без ленты ничего не фильтрует.
-export default function Header({ authorized = false, showFilters = false }) {
+// showFilters включается только на страницах с лентой каталога: панель фильтров
+// без ленты ничего не фильтрует. Состояние авторизации берётся из useAuth.
+export default function Header({ showFilters = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const blurTimeout = useRef(null);
 
@@ -19,6 +21,8 @@ export default function Header({ authorized = false, showFilters = false }) {
   const toggleVenue = useFiltersStore((s) => s.toggleVenue);
 
   const favCount = useFavorites((s) => s.ids.size);
+  const user = useAuth((s) => s.user);
+  const logout = useAuth((s) => s.logout);
   const suggestionGroups = useSearchSuggestions(q);
 
   function pickSuggestion(item) {
@@ -30,6 +34,11 @@ export default function Header({ authorized = false, showFilters = false }) {
     } else {
       navigate(`/events/${item.id}`);
     }
+  }
+
+  function handleLogout() {
+    logout();
+    navigate('/');
   }
 
   return (
@@ -94,17 +103,10 @@ export default function Header({ authorized = false, showFilters = false }) {
             <span>♡</span> Избранное{' '}
             {favCount > 0 && <span className={styles.favCount}>{favCount}</span>}
           </Link>
-          {authorized ? (
-            <>
-              <Link to="/account/orders" className={styles.ghostButton}>
-                <span>▤</span> Мои заказы
-              </Link>
-              <Link to="/account/orders" className={styles.primaryButton}>
-                Профиль
-              </Link>
-            </>
+          {user ? (
+            <AccountMenu email={user.email} onLogout={handleLogout} />
           ) : (
-            <Link to="/login" className={styles.loginButton}>
+            <Link to="/login" state={{ from: location }} className={styles.loginButton}>
               Войти
             </Link>
           )}

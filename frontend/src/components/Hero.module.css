@@ -194,3 +194,26 @@
   font-size: 12px;
   color: #d6d2e0;
 }
+
+/* На узких экранах колонка одна: главная карточка не должна резать заголовок
+   фиксированным 16:9, а боковые — схлопываться так, что бейдж даты наезжает на
+   название. Правила идут после базовых, иначе те перебивают их по каскаду. */
+@media (max-width: 900px) {
+  .main {
+    aspect-ratio: auto;
+    min-height: 300px;
+  }
+
+  .mainTitle {
+    font-size: 34px;
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sideCard {
+    aspect-ratio: 16 / 9;
+  }
+}

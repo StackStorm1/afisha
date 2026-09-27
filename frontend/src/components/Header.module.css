@@ -281,4 +281,27 @@
   .loginButton {
     padding: 0 12px;
   }
+
+  .email {
+    max-width: 140px;
+  }
+}
+
+/* Email авторизованного посетителя в шапке (#49): ссылка в кабинет,
+   длинный адрес обрезается многоточием, чтобы не ломать вёрстку. */
+.email {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  padding: 0 4px;
+  transition: color 0.14s;
+}
+
+.email:hover {
+  color: var(--color-ink);
 }

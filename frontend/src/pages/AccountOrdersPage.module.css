@@ -1,0 +1,327 @@
+.main {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 40px 40px 120px;
+}
+
+.pageTitle {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  margin: 0 0 24px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+  height: 44px;
+  padding: 0 4px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.14s;
+}
+
+.tab:hover {
+  color: var(--color-ink);
+}
+
+.tab[data-active='true'] {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-accent);
+}
+
+.tabCount {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
+
+.tab[data-active='true'] .tabCount {
+  color: var(--color-link);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.empty {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 40px 32px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 24px;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+.emptyText {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-ink-secondary);
+  margin: 0 auto 22px;
+  max-width: 46ch;
+}
+
+.gate {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 56px 40px;
+  text-align: center;
+  margin-top: 24px;
+}
+
+.gateTitle {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+
+.gateText {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-ink-secondary);
+  margin: 0 auto 26px;
+  max-width: 48ch;
+}
+
+.gateActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cta {
+  height: 48px;
+  padding: 0 26px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.14s;
+}
+
+.cta:hover {
+  background: var(--color-accent-hover);
+  color: #fff;
+}
+
+.ctaGhost {
+  height: 48px;
+  padding: 0 26px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-control);
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.14s;
+}
+
+.ctaGhost:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+@media (max-width: 600px) {
+  .main {
+    padding: 24px 16px 80px;
+  }
+}
+
+/* Верхние вкладки кабинета «Заказы» / «Профиль» (#49/#50 доработка) */
+.sections {
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 4px;
+}
+
+.sectionTab {
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  transition:
+    background 0.14s,
+    color 0.14s;
+}
+
+.sectionTab:hover {
+  color: var(--color-ink);
+}
+
+.sectionTab[data-active='true'] {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+/* Форма профиля */
+.profile {
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-secondary);
+}
+
+.input {
+  height: 48px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.14s;
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+.input[data-invalid='true'] {
+  border-color: var(--color-status-error);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--color-status-error);
+}
+
+.profileActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.save {
+  height: 48px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.save:hover {
+  background: var(--color-accent-hover);
+}
+
+.logout {
+  height: 48px;
+  padding: 0 22px;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.logout:hover {
+  background: var(--color-surface-hover);
+}
+
+.saved {
+  font-size: 13px;
+  color: var(--color-cat-standup);
+}
+
+/* Шапка страницы «Мои заказы» */
+.head {
+  margin-bottom: 22px;
+}
+
+.back {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-ink);
+}
+
+.ordersTitle {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  margin: 10px 0 0;
+}
+
+.subtitle {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  margin: 8px 0 0;
+}

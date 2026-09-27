@@ -119,13 +119,6 @@
   align-items: start;
 }
 
-@media (max-width: 900px) {
-  .sessionsSection,
-  .infoSection {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .sectionTitle {
   font-family: var(--font-display);
   font-weight: 400;
@@ -577,4 +570,39 @@
 .notFound {
   padding: 80px 0;
   text-align: center;
+}
+
+/* Мобильная раскладка. Блок в конце файла намеренно: базовые .infoSection и
+   .hero идут ниже своих ранних медиазапросов, поэтому оверрайды должны стоять
+   после них, иначе каскад их перебивает. */
+@media (max-width: 900px) {
+  .hero {
+    aspect-ratio: auto;
+    min-height: 300px;
+    max-height: none;
+    padding: 24px;
+  }
+
+  .heroTitle {
+    font-size: 40px;
+  }
+
+  .sessionsSection,
+  .infoSection {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aside {
+    position: static;
+  }
+
+  .sessionAction {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sessionButton {
+    flex: 1;
+    justify-content: center;
+  }
 }

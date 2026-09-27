@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import styles from './Footer.module.css';
 
 export default function Footer() {
@@ -6,15 +7,15 @@ export default function Footer() {
       <div className={styles.inner}>
         <span className={styles.logo}>Stack Afisha</span>
         <div className={styles.links}>
-          <a className={styles.link} href="#feed">
+          <Link className={styles.link} to="/organizers">
             Организаторам
-          </a>
-          <a className={styles.link} href="#feed">
+          </Link>
+          <Link className={styles.link} to="/refunds">
             Возврат билетов
-          </a>
-          <a className={styles.link} href="#feed">
+          </Link>
+          <Link className={styles.link} to="/support">
             Поддержка
-          </a>
+          </Link>
         </div>
         <span className={styles.copy}>© 2026 Stack Afisha</span>
       </div>
