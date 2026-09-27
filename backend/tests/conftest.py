@@ -60,6 +60,7 @@ def migrated_database() -> Iterator[None]:
 
 @pytest_asyncio.fixture
 async def session(migrated_database):
+    _reset_caches()
     async with get_engine().connect() as conn:
         await conn.begin()
         async with AsyncSession(
@@ -69,6 +70,7 @@ async def session(migrated_database):
         ) as s:
             yield s
         await conn.rollback()
+    _reset_caches()
 
 
 @pytest_asyncio.fixture
