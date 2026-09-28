@@ -41,6 +41,10 @@ export function formatTime(isoDate) {
   return `${hours}:${minutes}`;
 }
 
+export function formatMonthShort(isoDate) {
+  return MONTHS[new Date(isoDate).getUTCMonth()];
+}
+
 export function isSameCalendarDay(isoDate, reference) {
   const a = new Date(isoDate);
   const b = reference;
@@ -66,6 +70,14 @@ export function pluralizeEvents(count) {
 
 export function pluralizeSessions(count) {
   return pluralize(count, 'сеанс', 'сеанса', 'сеансов');
+}
+
+export function pluralizeSeats(count) {
+  return pluralize(count, 'место', 'места', 'мест');
+}
+
+export function pluralizeRows(count) {
+  return pluralize(count, 'ряд', 'ряда', 'рядов');
 }
 
 // "2 ч 40 мин"

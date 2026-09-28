@@ -1,4 +1,5 @@
 import { Routes, Route, useParams } from 'react-router-dom';
+import ScrollToTop from './components/ScrollToTop.jsx';
 import HomePage from './pages/HomePage.jsx';
 import EventPage from './pages/EventPage.jsx';
 import AuthPage from './pages/AuthPage.jsx';
@@ -15,11 +16,14 @@ function EventPageRoute() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/events/:eventId" element={<EventPageRoute />} />
-      <Route path="/login" element={<AuthPage key="login" mode="login" />} />
-      <Route path="/register" element={<AuthPage key="register" mode="register" />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/events/:eventId" element={<EventPageRoute />} />
+        <Route path="/login" element={<AuthPage key="login" mode="login" />} />
+        <Route path="/register" element={<AuthPage key="register" mode="register" />} />
+      </Routes>
+    </>
   );
 }

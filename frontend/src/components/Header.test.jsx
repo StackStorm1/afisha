@@ -16,7 +16,7 @@ const VISITOR = {
   },
 };
 
-function renderAt(path, { variant } = {}) {
+function renderAt(path, { showFilters } = {}) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -24,7 +24,7 @@ function renderAt(path, { variant } = {}) {
           path="*"
           element={
             <>
-              <Header variant={variant} />
+              <Header showFilters={showFilters} />
               <p data-testid="page">{path}</p>
             </>
           }
@@ -103,7 +103,7 @@ describe('Header — состояние авторизации', () => {
   it('выход с защищённой страницы уводит на главную', async () => {
     useAuth.setState(VISITOR);
     const user = userEvent.setup();
-    renderAt('/account/orders', { variant: 'compact' });
+    renderAt('/account/orders');
     await user.click(screen.getByRole('button', { name: /Профиль/ }));
     await user.click(screen.getByRole('button', { name: 'Выйти' }));
     expect(screen.queryByTestId('page')).not.toBeInTheDocument();
@@ -111,7 +111,7 @@ describe('Header — состояние авторизации', () => {
 
   it('кнопка текущего раздела подсвечена', () => {
     useAuth.setState(VISITOR);
-    renderAt('/account/orders', { variant: 'compact' });
+    renderAt('/account/orders');
     expect(screen.getByRole('link', { name: /Мои заказы/ })).toHaveAttribute(
       'aria-current',
       'page'
@@ -123,16 +123,16 @@ describe('Header — состояние авторизации', () => {
 });
 
 describe('Header — варианты', () => {
-  it('облегчённая шапка — без строки фильтров каталога', () => {
-    renderAt('/favorites', { variant: 'compact' });
+  it('по умолчанию шапка без строки фильтров каталога', () => {
+    renderAt('/favorites');
     expect(
       screen.getByPlaceholderText('Поиск по названию или площадке')
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Ещё фильтры/ })).not.toBeInTheDocument();
   });
 
-  it('полная шапка — со строкой фильтров', () => {
-    renderAt('/events/1');
+  it('с showFilters — со строкой фильтров', () => {
+    renderAt('/events/1', { showFilters: true });
     expect(screen.getByRole('button', { name: /Ещё фильтры/ })).toBeInTheDocument();
   });
 });

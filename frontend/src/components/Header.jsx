@@ -4,48 +4,24 @@ import { useFiltersStore } from '../store/useFiltersStore.js';
 import { useFavorites } from '../store/useFavorites.js';
 import { useAuth } from '../store/useAuth.js';
 import ProfileMenu from './ProfileMenu.jsx';
-import { CATEGORIES } from '../data/categories.js';
-import { getVenueById } from '../data/venues.js';
-import { useDateStrip } from '../lib/useDateStrip.js';
 import { useSearchSuggestions } from '../lib/useSearchSuggestions.js';
-import { pluralizeEvents } from '../lib/format.js';
+import CatalogFilters from './CatalogFilters.jsx';
 import styles from './Header.module.css';
 
-const TIME_OPTIONS = [
-  { key: 'today', label: 'Сегодня' },
-  { key: 'tomorrow', label: 'Завтра' },
-  { key: 'weekend', label: 'Выходные' },
-  { key: 'week', label: 'На неделе' },
-  { key: 'custom', label: 'Выбрать даты' },
-];
-
-const AGE_OPTIONS = [6, 12, 16, 18];
-
-// variant: 'full' — с поиском и строкой фильтров каталога (главная, событие);
-// 'compact' — без строки фильтров (избранное, заказы): там фильтры ничего
-// не фильтруют.
-export default function Header({ variant = 'full' }) {
+// showFilters включается только на страницах с лентой каталога: панель
+// фильтров без ленты ничего не фильтрует.
+export default function Header({ showFilters = false }) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const blurTimeout = useRef(null);
 
-  const { q, time, day, priceUnder1500, category, venueId, age, moreOpen } =
-    useFiltersStore();
+  const q = useFiltersStore((s) => s.q);
   const setQuery = useFiltersStore((s) => s.setQuery);
-  const toggleTime = useFiltersStore((s) => s.toggleTime);
-  const togglePrice = useFiltersStore((s) => s.togglePrice);
-  const toggleCategory = useFiltersStore((s) => s.toggleCategory);
-  const clearVenue = useFiltersStore((s) => s.clearVenue);
   const toggleVenue = useFiltersStore((s) => s.toggleVenue);
-  const toggleAge = useFiltersStore((s) => s.toggleAge);
-  const toggleMore = useFiltersStore((s) => s.toggleMore);
 
   const authStatus = useAuth((s) => s.status);
   const favCount = useFavorites((s) => s.ids.size);
-  const dateStrip = useDateStrip();
   const suggestionGroups = useSearchSuggestions(q);
-  const venue = venueId ? getVenueById(venueId) : null;
-  const showDateStrip = time === 'custom' || Boolean(day);
 
   function pickSuggestion(item) {
     setSearchOpen(false);
@@ -138,111 +114,7 @@ export default function Header({ variant = 'full' }) {
         </div>
       </div>
 
-      {variant === 'full' && (
-        <div className={styles.filterBar}>
-          <div className={styles.filterRow}>
-            {TIME_OPTIONS.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                className={styles.chip}
-                data-active={time === option.key}
-                onClick={() => toggleTime(option.key)}
-              >
-                {option.label}
-                {time === option.key && <span className={styles.chipClose}>×</span>}
-              </button>
-            ))}
-
-            <span className={styles.divider} />
-            <button
-              type="button"
-              className={styles.chip}
-              data-active={priceUnder1500}
-              onClick={togglePrice}
-            >
-              До 1500 ₽{priceUnder1500 && <span className={styles.chipClose}>×</span>}
-            </button>
-
-            <span className={styles.divider} />
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.code}
-                type="button"
-                className={styles.chip}
-                data-active={category === cat.code}
-                onClick={() => toggleCategory(cat.code)}
-              >
-                {cat.name}
-                {category === cat.code && <span className={styles.chipClose}>×</span>}
-              </button>
-            ))}
-
-            {venue && (
-              <button
-                type="button"
-                className={styles.chip}
-                data-active="true"
-                onClick={clearVenue}
-              >
-                ◉ {venue.name}
-                <span className={styles.chipClose}>×</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              className={styles.moreButton}
-              data-open={moreOpen}
-              onClick={toggleMore}
-            >
-              Ещё фильтры {age && <span className={styles.favCount}>1</span>}
-            </button>
-          </div>
-
-          {showDateStrip && (
-            <div className={styles.dateStripWrap}>
-              <div className={styles.dateStrip}>
-                {dateStrip.map((d) => (
-                  <button
-                    key={d.iso}
-                    type="button"
-                    className={styles.dateChip}
-                    data-active={d.active}
-                    data-empty={d.count === 0}
-                    onClick={d.pick}
-                  >
-                    <span className={styles.dateDow}>{d.dow}</span>
-                    <span className={styles.dateNum}>{d.num}</span>
-                    <span className={styles.dateCount}>
-                      {d.count > 0 ? pluralizeEvents(d.count) : '—'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {moreOpen && (
-            <div className={styles.morePanelWrap}>
-              <div className={styles.morePanel}>
-                <span className={styles.morePanelLabel}>Возраст</span>
-                {AGE_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className={styles.chip}
-                    data-active={age === option}
-                    onClick={() => toggleAge(option)}
-                  >
-                    {option}+
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {showFilters && <CatalogFilters />}
     </header>
   );
 }
