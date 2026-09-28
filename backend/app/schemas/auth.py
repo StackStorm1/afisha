@@ -1,8 +1,12 @@
+from enum import StrEnum
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, EmailStr, Field
 
-from app.enums import UserRole
+
+class UserRole(StrEnum):
+    VISITOR = "visitor"
+    ADMIN = "admin"
 
 
 class RegisterRequest(BaseModel):
