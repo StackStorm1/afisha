@@ -4,10 +4,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
+from app.api.deps import DbSession
 from app.schemas.errors import ErrorResponse
 from app.schemas.events import EventListResponse, EventResponse
 from app.schemas.sessions import SessionListResponse, SessionStatus
-from app.stubs.fixtures import EVENT_DETAIL, EVENT_SUMMARY, PAGINATION, SESSION
+from app.services import events as events_service
+from app.stubs.fixtures import EVENT_DETAIL, PAGINATION, SESSION
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -22,6 +24,7 @@ router = APIRouter(prefix="/events", tags=["events"])
     },
 )
 async def list_events(
+    db: DbSession,
     category: str | None = Query(None, description="Slug категории"),
     date_from: date | None = Query(
         None, description="Нижняя граница даты начала сеанса"
@@ -38,9 +41,19 @@ async def list_events(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
+    items, pagination = await events_service.list_events(
+        db,
+        category=category,
+        date_from=date_from,
+        date_to=date_to,
+        q=q,
+        sort=sort,
+        page=page,
+        per_page=per_page,
+    )
     return {
-        "data": [EVENT_SUMMARY.model_dump(mode="json")],
-        "pagination": PAGINATION.model_dump(mode="json"),
+        "data": [e.model_dump(mode="json") for e in items],
+        "pagination": pagination.model_dump(),
     }
 
 
