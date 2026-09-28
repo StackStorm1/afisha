@@ -12,6 +12,7 @@ import {
   MAX_SEATS_PER_ORDER,
 } from './orders.js';
 import { expectOrderDetail, expectPagination } from './schemaAssertions.js';
+import { DEMO_USER } from './auth.js';
 
 function freeSession(minFreeSeats = 2) {
   const events = listEvents({ per_page: 200 }).data;
@@ -278,6 +279,41 @@ describe('orders mock — отмена и список заказов (US-15, US
       expectOrderDetail(o);
       expect(o.status).toBe('pending');
     }
+  });
+
+  it('listMyOrders отдаёт только заказы текущего пользователя', () => {
+    const { session, freeSeats } = freeSession(2);
+    const mine = createOrder({
+      sessionId: session.id,
+      seatIds: [freeSeats[0].id],
+      userId: 'user-a',
+    });
+    const theirs = createOrder({
+      sessionId: session.id,
+      seatIds: [freeSeats[1].id],
+      userId: 'user-b',
+    });
+
+    const ids = listMyOrders({ userId: 'user-a' }).data.map((o) => o.id);
+    expect(ids).toContain(mine.id);
+    expect(ids).not.toContain(theirs.id);
+    expect(listMyOrders({ userId: 'user-c' }).data).toEqual([]);
+  });
+
+  it('у демо-аккаунта есть заказы во всех четырёх статусах, предстоящие и прошедшие', () => {
+    const { data } = listMyOrders({ userId: DEMO_USER.id, per_page: 100 });
+    for (const o of data) expectOrderDetail(o);
+
+    expect(new Set(data.map((o) => o.status))).toEqual(
+      new Set(['paid', 'pending', 'failed', 'cancelled'])
+    );
+    const now = new Date();
+    expect(data.some((o) => new Date(o.session.starts_at) > now)).toBe(true);
+    expect(data.some((o) => new Date(o.session.starts_at) < now)).toBe(true);
+    // Повторный запрос не дублирует демо-заказы.
+    expect(listMyOrders({ userId: DEMO_USER.id, per_page: 100 }).data).toHaveLength(
+      data.length
+    );
   });
 });
 

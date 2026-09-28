@@ -36,8 +36,20 @@ export function normalizeEmail(email) {
     .toLowerCase();
 }
 
+// Демо-аккаунт с готовыми заказами. Оформления заказа в интерфейсе пока
+// нет, и без этого аккаунта кабинет заказов было бы нечем наполнить.
+// id фиксирован: по нему мок заказов узнаёт, кому выдать демо-заказы.
+export const DEMO_USER = {
+  id: 'd3e00000-0000-4000-8000-000000000001',
+  email: 'demo@stack-afisha.ru',
+  password: 'demo12345',
+  role: 'visitor',
+  created_at: '2026-09-01T09:00:00Z',
+};
+
 function loadUsers() {
-  return readJson(USERS_KEY, []);
+  const users = readJson(USERS_KEY, []);
+  return users.some((u) => u.id === DEMO_USER.id) ? users : [DEMO_USER, ...users];
 }
 
 function toProfile(user) {

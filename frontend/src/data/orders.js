@@ -2,6 +2,8 @@ import { uuid } from '../lib/uuid.js';
 import { toMoney } from '../lib/money.js';
 import { getEventBySessionId, getSession } from './events.js';
 import { findSeat, getSeatMap } from './seatMap.js';
+import { DEMO_USER } from './auth.js';
+import { buildDemoOrders } from './demoOrders.js';
 
 const HOLD_MINUTES = 15; // BR-02
 
@@ -12,6 +14,11 @@ const MIN_SEATS_PER_ORDER = 1;
 export const MAX_SEATS_PER_ORDER = 10;
 
 const ordersById = new Map();
+// Владелец заказа хранится отдельно: в OrderDetail поля пользователя нет,
+// на бэкенде принадлежность берётся из токена (GET /orders отдаёт только
+// брони текущего пользователя, BR-07).
+const ownerByOrderId = new Map();
+let demoSeeded = false;
 
 function isoNow() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -97,7 +104,7 @@ function validateSeatIds(seatIds) {
 // статус заказа сразу pending. Бросает OrderError с кодом SEAT_ALREADY_TAKEN,
 // если среди seatIds есть уже занятое — форма ошибки повторяет Error/details
 // из openapi.yaml, чтобы обработчик конфликта мог отличить его от прочих.
-export function createOrder({ sessionId, seatIds }) {
+export function createOrder({ sessionId, seatIds, userId }) {
   // Тело запроса проверяется до поиска сеанса: на бэкенде границы minItems/
   // maxItems снимет схема запроса, то есть ещё до обработчика ручки.
   validateSeatIds(seatIds);
@@ -155,6 +162,7 @@ export function createOrder({ sessionId, seatIds }) {
   };
 
   ordersById.set(order.id, order);
+  ownerByOrderId.set(order.id, userId);
   return order;
 }
 
@@ -227,9 +235,25 @@ export function cancelOrder(orderId) {
   return order;
 }
 
-// Мок GET /orders (US-15) — форма ответа: OrderListResponse.
-export function listMyOrders({ status, page = 1, per_page = 20 } = {}) {
+// Демо-заказы появляются при первом запросе демо-аккаунта и живут, как
+// обычные заказы, в памяти вкладки: истекают, отменяются, пересобираются
+// после перезагрузки.
+function seedDemoOrders() {
+  if (demoSeeded) return;
+  demoSeeded = true;
+  for (const order of buildDemoOrders()) {
+    ordersById.set(order.id, order);
+    ownerByOrderId.set(order.id, DEMO_USER.id);
+  }
+}
+
+// Мок GET /orders (US-15) — форма ответа: OrderListResponse. userId заменяет
+// токен из заголовка: заказы других пользователей в ответ не попадают.
+export function listMyOrders({ userId, status, page = 1, per_page = 20 } = {}) {
+  if (userId === DEMO_USER.id) seedDemoOrders();
+
   const all = Array.from(ordersById.values())
+    .filter((order) => ownerByOrderId.get(order.id) === userId)
     .filter((order) => !status || order.status === status)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
