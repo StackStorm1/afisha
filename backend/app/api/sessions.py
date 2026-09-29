@@ -2,10 +2,12 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
+from app.api.deps import DbSession
 from app.schemas.errors import ErrorResponse
 from app.schemas.seatMap import SeatMapResponse
 from app.schemas.sessions import SessionResponse
-from app.stubs.fixtures import SEAT_MAP, SESSION
+from app.services import sessions as sessions_service
+from app.stubs.fixtures import SEAT_MAP
 
 router = APIRouter(tags=["sessions"])
 
@@ -20,8 +22,9 @@ router = APIRouter(tags=["sessions"])
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
 )
-async def get_session(id: UUID):
-    return {"data": SESSION.model_dump(mode="json")}
+async def get_session(id: UUID, db: DbSession):
+    session = await sessions_service.get_session(db, id)
+    return {"data": session.model_dump(mode="json")}
 
 
 @router.get(
