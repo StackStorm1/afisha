@@ -43,7 +43,9 @@ async def _make_seats(s: AsyncSession, venue) -> list[Seat]:
 
 @pytest_asyncio.fixture
 async def ctx(session: AsyncSession):
-    city = (await session.execute(select(City).where(City.slug == "moscow"))).scalar_one()
+    city = (
+        await session.execute(select(City).where(City.slug == "moscow"))
+    ).scalar_one()
     category = (
         await session.execute(select(Category).where(Category.slug == "concert"))
     ).scalar_one()
@@ -83,7 +85,9 @@ async def test_create_order_201(client: AsyncClient, ctx):
 
 
 @pytest.mark.asyncio
-async def test_seats_available_decremented(client: AsyncClient, ctx, session: AsyncSession):
+async def test_seats_available_decremented(
+    client: AsyncClient, ctx, session: AsyncSession
+):
     """seats_available уменьшился ровно на число мест в заказе."""
     initial = ctx.db_session.seats_available
     seat_ids = [str(ctx.seats[0].id), str(ctx.seats[1].id)]
@@ -121,7 +125,9 @@ async def test_seat_already_taken_409(client: AsyncClient, ctx):
 
 
 @pytest.mark.asyncio
-async def test_failed_booking_no_leftovers(client: AsyncClient, ctx, session: AsyncSession):
+async def test_failed_booking_no_leftovers(
+    client: AsyncClient, ctx, session: AsyncSession
+):
     """После неудачной попытки нет ни заказа ни броней, seats_available не изменился."""
     from sqlalchemy import func
 
