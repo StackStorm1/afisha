@@ -9,7 +9,7 @@ from app.schemas.errors import ErrorResponse
 from app.schemas.events import EventListResponse, EventResponse
 from app.schemas.sessions import SessionListResponse, SessionStatus
 from app.services import events as events_service
-from app.stubs.fixtures import EVENT_DETAIL, PAGINATION, SESSION
+from app.services import sessions as sessions_service
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -67,8 +67,9 @@ async def list_events(
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
 )
-async def get_event(id: UUID):
-    return {"data": EVENT_DETAIL.model_dump(mode="json")}
+async def get_event(id: UUID, db: DbSession):
+    event = await events_service.get_event(db, id)
+    return {"data": event.model_dump(mode="json")}
 
 
 @router.get(
@@ -84,13 +85,23 @@ async def get_event(id: UUID):
 )
 async def list_event_sessions(
     id: UUID,
+    db: DbSession,
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
     status: SessionStatus = Query(SessionStatus.ACTIVE, description="Статус сеанса"),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
 ):
+    items, pagination = await sessions_service.list_event_sessions(
+        db,
+        event_id=id,
+        date_from=date_from,
+        date_to=date_to,
+        session_status=status,
+        page=page,
+        per_page=per_page,
+    )
     return {
-        "data": [SESSION.model_dump(mode="json")],
-        "pagination": PAGINATION.model_dump(mode="json"),
+        "data": [s.model_dump(mode="json") for s in items],
+        "pagination": pagination.model_dump(),
     }
