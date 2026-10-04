@@ -27,6 +27,16 @@ export function splitOrders(orders, now = new Date()) {
   return { upcoming, past };
 }
 
+// US-17: отменить можно неоплаченную бронь или оплаченный заказ, пока сеанс
+// не начался. Ошибка оплаты и отмена — конечные статусы (ORDER_NOT_CANCELLABLE
+// в openapi.yaml).
+export function isCancellable(order, now = new Date()) {
+  return (
+    (order.status === 'paid' || order.status === 'pending') &&
+    new Date(order.session.starts_at) > now
+  );
+}
+
 // «пн, 14 сен»
 function formatDayLabel(iso) {
   const date = new Date(iso);

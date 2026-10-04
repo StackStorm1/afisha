@@ -1,0 +1,130 @@
+/* Панель-контейнер служебного уровня: без скругления, как карточки. */
+.dialog {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  width: min(480px, calc(100vw - 32px));
+  max-width: none;
+}
+
+.dialog::backdrop {
+  background: rgba(11, 11, 17, 0.78);
+}
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-panel);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.order {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.orderTitle {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.orderLine {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.orderNumber {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.text {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--color-ink-secondary);
+  margin: 0;
+}
+
+.error {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-status-error);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.secondary,
+.danger {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s;
+}
+
+.secondary {
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+/* Тот же розовый, что у статусов «Ошибка оплаты» и «Отменён». */
+.danger {
+  border: 1px solid rgba(255, 143, 164, 0.5);
+  background: rgba(255, 143, 164, 0.14);
+  color: var(--color-status-error);
+}
+
+.danger:hover:not(:disabled) {
+  background: rgba(255, 143, 164, 0.24);
+}
+
+.secondary:disabled,
+.danger:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+@media (max-width: 600px) {
+  .panel {
+    padding: 24px 20px;
+  }
+
+  .actions > * {
+    flex: 1;
+  }
+}

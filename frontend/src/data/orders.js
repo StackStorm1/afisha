@@ -216,12 +216,19 @@ export function payOrder(orderId, { outcome = 'success' } = {}) {
   return order;
 }
 
-// Мок US-17: отмена заказа до начала сеанса.
-export function cancelOrder(orderId) {
+// Мок DELETE /orders/{id} (US-17): отмена заказа в статусе pending или paid
+// до начала сеанса. userId заменяет токен из заголовка: чужой заказ, как и
+// несуществующий, — ORDER_NOT_FOUND (BR-07).
+export function cancelOrder(orderId, { userId } = {}) {
   const order = ordersById.get(orderId);
-  if (!order) throw new OrderError('ORDER_NOT_FOUND', 'Заказ не найден');
+  if (!order || (userId && ownerByOrderId.get(orderId) !== userId)) {
+    throw new OrderError('ORDER_NOT_FOUND', 'Заказ не найден');
+  }
   if (order.status === 'cancelled') {
     throw new OrderError('ORDER_NOT_CANCELLABLE', 'Заказ уже отменён');
+  }
+  if (order.status === 'failed') {
+    throw new OrderError('ORDER_NOT_CANCELLABLE', 'Платёж по заказу не прошёл');
   }
   if (new Date(order.session.starts_at) <= new Date()) {
     throw new OrderError(

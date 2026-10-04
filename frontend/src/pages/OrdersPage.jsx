@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
 import PosterImage from '../components/PosterImage.jsx';
-import { listMyOrders } from '../data/orders.js';
+import CancelOrderDialog from '../components/CancelOrderDialog.jsx';
+import { cancelOrder, listMyOrders } from '../data/orders.js';
 import { useAuth } from '../store/useAuth.js';
-import { buildOrderRow, groupUpcoming, splitOrders } from '../lib/orderView.js';
+import {
+  buildOrderRow,
+  groupUpcoming,
+  isCancellable,
+  splitOrders,
+} from '../lib/orderView.js';
 import styles from './OrdersPage.module.css';
 
 // per_page — максимум контракта. Больше сотни заказов у посетителя в MVP не
@@ -18,7 +24,7 @@ const TABS = [
   { key: 'past', label: 'Прошедшие', empty: 'Прошедших заказов нет' },
 ];
 
-function OrderRow({ order, past }) {
+function OrderRow({ order, past, onCancel }) {
   const row = buildOrderRow(order);
   return (
     <li className={styles.row}>
@@ -54,10 +60,22 @@ function OrderRow({ order, past }) {
         <span className={styles.label}>{row.number}</span>
         <span className={styles.total}>{row.total}</span>
       </div>
-      <span className={styles.status} data-status={row.status}>
-        <span aria-hidden="true">{row.glyph}</span>
-        {row.label}
-      </span>
+      <div className={styles.statusCell}>
+        <span className={styles.status} data-status={row.status}>
+          <span aria-hidden="true">{row.glyph}</span>
+          {row.label}
+        </span>
+        {onCancel && (
+          <button
+            type="button"
+            className={styles.cancel}
+            aria-label={`Отменить заказ «${row.title}», ${row.number}`}
+            onClick={() => onCancel(order)}
+          >
+            Отменить заказ
+          </button>
+        )}
+      </div>
     </li>
   );
 }
@@ -76,6 +94,8 @@ function EmptyOrders({ text }) {
 export default function OrdersPage() {
   const userId = useAuth((s) => s.user?.id);
   const [tab, setTab] = useState('upcoming');
+  const [cancelling, setCancelling] = useState(null);
+  const queryClient = useQueryClient();
 
   // Через react-query, а не напрямую: фоновое истечение броней сбрасывает
   // кэш запросов, и «Ожидает оплаты» сменится на «Отменён» без перезагрузки.
@@ -83,6 +103,26 @@ export default function OrdersPage() {
     queryKey: ['orders', userId],
     queryFn: () => listMyOrders({ userId, per_page: ORDERS_PER_PAGE }).data,
   });
+
+  const cancel = useMutation({
+    mutationFn: (order) => cancelOrder(order.id, { userId }),
+    onSuccess: () => {
+      setCancelling(null);
+      queryClient.invalidateQueries({ queryKey: ['orders', userId] });
+    },
+  });
+
+  function openCancel(order) {
+    cancel.reset();
+    setCancelling(order);
+  }
+
+  function closeCancel() {
+    // Ошибка могла означать, что заказ уже в другом статусе (истёк, начался
+    // сеанс) — перечитываем список, чтобы кнопка не осталась висеть.
+    if (cancel.isError) queryClient.invalidateQueries({ queryKey: ['orders', userId] });
+    setCancelling(null);
+  }
 
   const now = new Date();
   const split = splitOrders(orders, now);
@@ -139,7 +179,12 @@ export default function OrdersPage() {
                     )}
                     <ul className={styles.list}>
                       {group.orders.map((order) => (
-                        <OrderRow key={order.id} order={order} past={tab === 'past'} />
+                        <OrderRow
+                          key={order.id}
+                          order={order}
+                          past={tab === 'past'}
+                          onCancel={isCancellable(order, now) ? openCancel : null}
+                        />
                       ))}
                     </ul>
                   </section>
@@ -150,6 +195,15 @@ export default function OrdersPage() {
         )}
       </main>
       <Footer />
+      {cancelling && (
+        <CancelOrderDialog
+          row={buildOrderRow(cancelling)}
+          pending={cancel.isPending}
+          error={cancel.error}
+          onConfirm={() => cancel.mutate(cancelling)}
+          onClose={closeCancel}
+        />
+      )}
     </>
   );
 }

@@ -255,6 +255,40 @@ describe('orders mock — отмена и список заказов (US-15, US
     expect(rebooked.seats[0].id).toBe(seatId);
   });
 
+  it('оплаченный заказ отменяется, места освобождаются (US-17)', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    payOrder(order.id, { outcome: 'success' });
+
+    expect(cancelOrder(order.id).status).toBe('cancelled');
+  });
+
+  it('заказ с ошибкой оплаты отменить нельзя — ORDER_NOT_CANCELLABLE', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    expect(() => payOrder(order.id, { outcome: 'fail' })).toThrow();
+
+    expect(() => cancelOrder(order.id)).toThrow(
+      expect.objectContaining({ code: 'ORDER_NOT_CANCELLABLE' })
+    );
+    expect(getOrder(order.id).status).toBe('failed');
+  });
+
+  it('чужой заказ — ORDER_NOT_FOUND, статус не меняется (BR-07)', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({
+      sessionId: session.id,
+      seatIds: [freeSeats[0].id],
+      userId: 'owner',
+    });
+
+    expect(() => cancelOrder(order.id, { userId: 'someone-else' })).toThrow(
+      expect.objectContaining({ code: 'ORDER_NOT_FOUND' })
+    );
+    expect(getOrder(order.id).status).toBe('pending');
+    expect(cancelOrder(order.id, { userId: 'owner' }).status).toBe('cancelled');
+  });
+
   it('повторная отмена уже отменённого заказа — ORDER_NOT_CANCELLABLE', () => {
     const { session, freeSeats } = freeSession();
     const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });

@@ -229,9 +229,16 @@
 
 /* --- Статус --- */
 
-.status {
+.statusCell {
   grid-area: status;
   justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.status {
   height: 36px;
   padding: 0 14px;
   border-radius: var(--radius-pill);
@@ -263,6 +270,26 @@
 
 .status[data-status='cancelled'] {
   border: 1px solid rgba(255, 143, 164, 0.5);
+  color: var(--color-status-error);
+}
+
+/* Вторичное действие строки: текстовая кнопка, область нажатия 44px. */
+.cancel {
+  height: 44px;
+  padding: 0 4px;
+  margin-bottom: -12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.14s;
+}
+
+.cancel:hover {
   color: var(--color-status-error);
 }
 
@@ -338,7 +365,8 @@
     gap: 14px 16px;
   }
 
-  .status {
+  .statusCell {
     justify-self: start;
+    align-items: flex-start;
   }
 }
