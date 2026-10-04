@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, String, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, DateTime, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import CITEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,7 +35,7 @@ class User(Base):
         DateTime(timezone=True), server_default=text("now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("now()")
+        DateTime(timezone=True), server_default=text("now()"), onupdate=func.now()
     )
 
     orders: Mapped[list["Order"]] = relationship(back_populates="user", lazy="raise")

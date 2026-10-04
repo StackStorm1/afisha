@@ -3,7 +3,15 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Numeric, String, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Numeric,
+    String,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -45,7 +53,7 @@ class Order(Base):
         DateTime(timezone=True), server_default=text("now()")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=text("now()")
+        DateTime(timezone=True), server_default=text("now()"), onupdate=func.now()
     )
 
     user: Mapped["User"] = relationship(back_populates="orders", lazy="raise")

@@ -24,12 +24,17 @@ class Settings(BaseSettings):
 
     booking_hold_minutes: int = 15
 
+    api_prefix: str = "/api/v1"
     backend_cors_origins: str = "http://localhost"
     environment: str = "local"
     log_level: str = "info"
     debug: bool = False
 
-    model_config = SettingsConfigDict()
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.backend_cors_origins.split(",")]
 
 
 @lru_cache

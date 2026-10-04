@@ -44,3 +44,9 @@ class BookingStatus(StrEnum):
     PAID = "PAID"
     EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
+
+
+class SeatStatus(StrEnum):
+    FREE = "free"
+    HELD = "held"
+    PAID = "paid"
