@@ -45,7 +45,7 @@ describe('EventPage — лента дат достаёт до дальних с�
     renderEvent(event.id);
 
     const strip = screen.getByRole('button', {
-      name: new RegExp(`${Number(farDate.slice(8, 10))}\\s*${formatMonthShort(farDate)}`),
+      name: new RegExp(`${Number(farDate.slice(8, 10))} ${formatMonthShort(farDate)}`),
     });
     await user.click(strip);
 

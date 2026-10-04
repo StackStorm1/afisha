@@ -155,6 +155,10 @@ export default function EventPage() {
                   className={styles.dateChip}
                   data-active={day.active}
                   data-empty={day.soldOut}
+                  // Месяц виден только у первого чипа и при смене месяца —
+                  // для экранного диктора дата нужна целиком.
+                  aria-label={`${day.dow}, ${day.num} ${day.month}${day.label ? `, ${day.label}` : ''}`}
+                  aria-pressed={day.active}
                   onClick={() => setSelectedDay(day.iso)}
                 >
                   <span className={styles.dateDow}>{day.dow}</span>
