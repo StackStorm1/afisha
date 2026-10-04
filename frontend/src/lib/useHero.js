@@ -1,13 +1,7 @@
 import { useMemo } from 'react';
-import { listEvents, listEventSessions } from '../data/events.js';
-import { buildEventCard } from './buildEventCard.js';
+import { listEvents } from '../data/events.js';
+import { buildEventCard, nearestActiveSession } from './buildEventCard.js';
 import { timeToDateRange } from './dateRange.js';
-
-function nearestActiveSession(eventId) {
-  const sessions = listEventSessions(eventId).filter((s) => s.status === 'active');
-  if (sessions.length === 0) return null;
-  return sessions.reduce((min, s) => (s.starts_at < min.starts_at ? s : min));
-}
 
 // Герой главной — самый срочный сеанс (меньше всего свободных мест) плюс
 // сегодняшнее и ближайшее выходное событие, если такие есть.

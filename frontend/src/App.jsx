@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage.jsx';
 import EventPage from './pages/EventPage.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
+import FavoritesPage from './pages/FavoritesPage.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 
 // key={eventId}: без него React Router переиспользует тот же экземпляр
@@ -25,6 +26,14 @@ export default function App() {
         <Route path="/events/:eventId" element={<EventPageRoute />} />
         <Route path="/login" element={<AuthPage key="login" mode="login" />} />
         <Route path="/register" element={<AuthPage key="register" mode="register" />} />
+        <Route
+          path="/favorites"
+          element={
+            <RequireAuth reason="favorites">
+              <FavoritesPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/account/orders"
           element={
