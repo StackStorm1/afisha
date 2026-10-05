@@ -1,0 +1,39 @@
+.canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background-color: #0f0f16;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.07) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+  overflow: hidden;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.section {
+  cursor: pointer;
+}
+
+.label {
+  fill: var(--color-ink);
+  font-family: var(--font-interface);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.stage {
+  fill: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.3em;
+}

@@ -1,0 +1,245 @@
+.panel {
+  min-height: 100%;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.1;
+  text-transform: uppercase;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.kind {
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kind + .kind {
+  border-left: 1px solid var(--color-border-control);
+}
+
+.kind[aria-checked='true'] {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.kind[aria-checked='false']:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+  padding: 0;
+}
+
+.control {
+  height: 44px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+}
+
+.control:focus-within {
+  border-color: var(--color-link);
+}
+
+.input,
+.select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+}
+
+.unit {
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ranges {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.range {
+  min-height: 44px;
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 10px;
+  font-size: 13px;
+}
+
+.rangeRows {
+  font-family: var(--font-mono);
+  color: var(--color-ink-secondary);
+}
+
+.rangeInput {
+  width: 44px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.rangeInput::-webkit-inner-spin-button,
+.rangeInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+}
+
+.rangeSelect {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.rangeRemove {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.rangeRemove:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.link {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-link);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link:hover {
+  color: #c7c5ff;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.remove {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-status-error);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.total {
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.total > span:first-child {
+  color: var(--color-ink-secondary);
+}

@@ -10,6 +10,7 @@ import RequireAdmin from './components/RequireAdmin.jsx';
 import AdminLayout from './pages/admin/AdminLayout.jsx';
 import AdminEventsPage from './pages/admin/AdminEventsPage.jsx';
 import AdminVenuesPage from './pages/admin/AdminVenuesPage.jsx';
+import LayoutEditorPage from './pages/admin/LayoutEditorPage.jsx';
 
 // key={eventId}: без него React Router переиспользует тот же экземпляр
 // EventPage при переходе между двумя событиями (например, по клику на
@@ -58,6 +59,14 @@ export default function App() {
           <Route path="events" element={<AdminEventsPage />} />
           <Route path="venues" element={<AdminVenuesPage />} />
         </Route>
+        <Route
+          path="/admin/layouts/:layoutId"
+          element={
+            <RequireAdmin>
+              <LayoutEditorPage />
+            </RequireAdmin>
+          }
+        />
       </Routes>
     </>
   );

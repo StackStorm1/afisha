@@ -19,8 +19,13 @@ const MONTHS = [
 // только escape-последовательностью: буквальный символ отклоняет eslint
 // правилом no-irregular-whitespace.
 export function formatPrice(amount) {
-  const rounded = Math.round(Number(amount));
-  return `${String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ₽`;
+  return `${formatCount(amount)} ₽`;
+}
+
+// "2 648" — то же разбиение на разряды, что у цены, для счётчиков мест.
+export function formatCount(value) {
+  const rounded = Math.round(Number(value));
+  return String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
 // "14 сен, пн · 20:00"
@@ -57,11 +62,17 @@ export function isSameCalendarDay(isoDate, reference) {
 
 // Русская плюрализация: 1 событие / 2 события / 5 событий.
 export function pluralize(count, one, few, many) {
+  return `${count} ${pluralWord(count, one, few, many)}`;
+}
+
+// Только форма слова — когда число печатается отдельно, например с
+// разрядами: «1 800 мест».
+export function pluralWord(count, one, few, many) {
   const mod10 = count % 10;
   const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${count} ${one}`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${count} ${few}`;
-  return `${count} ${many}`;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+  return many;
 }
 
 export function pluralizeEvents(count) {
