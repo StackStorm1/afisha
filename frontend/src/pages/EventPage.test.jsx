@@ -45,7 +45,7 @@ describe('EventPage — лента дат достаёт до дальних с�
     renderEvent(event.id);
 
     const strip = screen.getByRole('button', {
-      name: new RegExp(`${Number(farDate.slice(8, 10))}\\s*${formatMonthShort(farDate)}`),
+      name: new RegExp(`${Number(farDate.slice(8, 10))} ${formatMonthShort(farDate)}`),
     });
     await user.click(strip);
 
@@ -87,13 +87,15 @@ describe('EventPage — панели фильтров каталога нет', 
     }
   });
 
-  it('поиск и избранное в хедере остаются', () => {
+  it('поиск и кнопка входа в хедере остаются', () => {
     renderEvent(catalog[0].id);
 
     expect(
       screen.getByPlaceholderText('Поиск по названию или площадке')
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Избранное/ })).toBeInTheDocument();
+    // Гостю «Избранное» не показывается, справа в шапке только «Войти».
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('link', { name: 'Войти' })).toBeInTheDocument();
   });
 });
 

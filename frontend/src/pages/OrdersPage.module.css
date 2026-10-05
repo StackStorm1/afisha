@@ -1,0 +1,372 @@
+.main {
+  max-width: var(--grid-max-width);
+  min-height: 760px;
+  margin: 0 auto;
+  padding: 48px 40px 120px;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 56px;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  margin: 0 0 28px;
+}
+
+/* --- Вкладки --- */
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.tab {
+  height: 36px;
+  padding: 0 15px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.14s;
+}
+
+.tab:hover {
+  background: var(--color-surface-hover);
+}
+
+.tab[aria-selected='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.tabCount {
+  color: var(--color-ink-muted);
+}
+
+.tab[aria-selected='true'] .tabCount {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* --- Группы и строки --- */
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding-bottom: 4px;
+  margin: 0;
+  font-weight: 400;
+}
+
+.groupLabel {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.groupMeta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 16px 24px 16px 16px;
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 240px 150px 200px;
+  grid-template-areas: 'poster info zone number status';
+  gap: 28px;
+  align-items: center;
+}
+
+.poster {
+  grid-area: poster;
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-poster);
+  overflow: hidden;
+}
+
+.poster[data-past='true'] {
+  opacity: 0.55;
+}
+
+.info {
+  grid-area: info;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-secondary);
+}
+
+.meta[data-category='concert'] {
+  color: var(--color-cat-concert);
+}
+
+.meta[data-category='theatre'] {
+  color: var(--color-cat-theatre);
+}
+
+.meta[data-category='standup'] {
+  color: var(--color-cat-standup);
+}
+
+.meta[data-category='festival'] {
+  color: var(--color-cat-festival);
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.title:hover {
+  color: var(--color-link);
+}
+
+.when {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.venue {
+  font-size: 13px;
+  color: var(--color-ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.venue span {
+  font-size: 12px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.zoneCell {
+  grid-area: zone;
+}
+
+.numberCell {
+  grid-area: number;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.seats {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.total {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* --- Статус --- */
+
+.statusCell {
+  grid-area: status;
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.status {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.status[data-status='paid'] {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  color: var(--color-ink);
+}
+
+.status[data-status='pending'] {
+  border: 1px solid var(--color-status-warning);
+  background: var(--color-status-warning);
+  color: var(--color-bg);
+}
+
+.status[data-status='failed'] {
+  border: 1px solid rgba(255, 143, 164, 0.5);
+  background: rgba(255, 143, 164, 0.14);
+  color: var(--color-status-error);
+}
+
+.status[data-status='cancelled'] {
+  border: 1px solid rgba(255, 143, 164, 0.5);
+  color: var(--color-status-error);
+}
+
+/* Вторичное действие строки: текстовая кнопка, область нажатия 44px. */
+.cancel {
+  height: 44px;
+  padding: 0 4px;
+  margin-bottom: -12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.14s;
+}
+
+.cancel:hover {
+  color: var(--color-status-error);
+}
+
+/* --- Пустое состояние --- */
+
+.empty {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.emptyText {
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.cta {
+  height: 48px;
+  padding: 0 24px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  transition: background 0.14s;
+}
+
+.cta:hover {
+  background: var(--color-accent-hover);
+}
+
+/* --- Адаптив: брейкпоинты те же, что у шапки и страницы события --- */
+
+@media (max-width: 1100px) {
+  /* Места и сумма уходят второй строкой под название, статус остаётся справа. */
+  .row {
+    grid-template-columns: 90px minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      'poster info info status'
+      'poster zone number number';
+    gap: 16px 28px;
+  }
+}
+
+@media (max-width: 600px) {
+  .main {
+    padding: 32px 20px 80px;
+  }
+
+  .heading {
+    font-size: 40px;
+  }
+
+  .row {
+    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-areas:
+      'poster info'
+      'zone zone'
+      'number number'
+      'status status';
+    padding: 16px;
+    gap: 14px 16px;
+  }
+
+  .statusCell {
+    justify-self: start;
+    align-items: flex-start;
+  }
+}
