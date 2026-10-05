@@ -1,8 +1,10 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 
-from app.core.errors import ErrorCode
+from app.api.deps import DbSession, current_user
+from app.models.users import User
 from app.schemas.errors import ErrorResponse
 from app.schemas.orders import (
     CreateOrderRequest,
@@ -10,7 +12,8 @@ from app.schemas.orders import (
     OrderListResponse,
     OrderStatus,
 )
-from app.stubs.fixtures import ORDER, PAGINATION, TAKEN_SEAT_ID
+from app.services import orders as orders_service
+from app.stubs.fixtures import ORDER
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -37,22 +40,13 @@ router = APIRouter(prefix="/orders", tags=["orders"])
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
 )
-async def create_order(body: CreateOrderRequest):
-    if TAKEN_SEAT_ID in body.seat_ids:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": ErrorCode.SEAT_ALREADY_TAKEN,
-                "message": "Одно или несколько выбранных мест уже заняты",
-                "details": [
-                    {
-                        "seat_id": str(TAKEN_SEAT_ID),
-                        "message": "Ряд 1, место 3 уже занято",
-                    }
-                ],
-            },
-        )
-    return {"data": ORDER.model_dump(mode="json")}
+async def create_order(
+    body: CreateOrderRequest,
+    db: DbSession,
+    user: Annotated[User, Depends(current_user)],
+):
+    order = await orders_service.create_order(db, body.session_id, body.seat_ids, user)
+    return {"data": order.model_dump(mode="json")}
 
 
 @router.get(
@@ -69,13 +63,18 @@ async def create_order(body: CreateOrderRequest):
     },
 )
 async def list_orders(
+    db: DbSession,
+    user: Annotated[User, Depends(current_user)],
     status: OrderStatus | None = Query(None, description="Фильтр по статусу брони"),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
+    items, pagination = await orders_service.list_orders(
+        db, user, order_status=status, page=page, per_page=per_page
+    )
     return {
-        "data": [ORDER.model_dump(mode="json")],
-        "pagination": PAGINATION.model_dump(mode="json"),
+        "data": [o.model_dump(mode="json") for o in items],
+        "pagination": pagination.model_dump(),
     }
 
 
@@ -93,8 +92,13 @@ async def list_orders(
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
 )
-async def get_order(id: UUID):
-    return {"data": ORDER.model_dump(mode="json")}
+async def get_order(
+    id: UUID,
+    db: DbSession,
+    user: Annotated[User, Depends(current_user)],
+):
+    order = await orders_service.get_order(db, id, user)
+    return {"data": order.model_dump(mode="json")}
 
 
 @router.delete(
@@ -112,8 +116,13 @@ async def get_order(id: UUID):
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
 )
-async def cancel_order(id: UUID):
-    return {"data": ORDER.model_dump(mode="json")}
+async def cancel_order(
+    id: UUID,
+    db: DbSession,
+    user: Annotated[User, Depends(current_user)],
+):
+    order = await orders_service.cancel_order(db, id, user)
+    return {"data": order.model_dump(mode="json")}
 
 
 @router.post(
