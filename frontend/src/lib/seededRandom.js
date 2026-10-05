@@ -19,3 +19,13 @@ export function pick(random, items) {
 export function randomInt(random, min, max) {
   return Math.floor(random() * (max - min + 1)) + min;
 }
+
+// Сид из строки (например, из id), чтобы у каждой сущности был свой
+// воспроизводимый генератор.
+export function hashSeed(text) {
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (Math.imul(31, hash) + text.charCodeAt(i)) | 0;
+  }
+  return hash >>> 0;
+}

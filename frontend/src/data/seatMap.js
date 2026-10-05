@@ -1,6 +1,6 @@
 import { uuid } from '../lib/uuid.js';
 import { toMoney } from '../lib/money.js';
-import { createSeededRandom, pick } from '../lib/seededRandom.js';
+import { createSeededRandom, hashSeed, pick } from '../lib/seededRandom.js';
 import { getSession } from './events.js';
 
 // Партер/балкон — requirements.md §3: минимум две ценовые категории.
@@ -14,14 +14,6 @@ const STALLS_FACTOR = 1;
 // со схемой зала.
 export function getBalconyStartRow(rowsCount) {
   return Math.ceil(rowsCount * (1 - BALCONY_SHARE)) + 1;
-}
-
-function hashSeed(text) {
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = (Math.imul(31, hash) + text.charCodeAt(i)) | 0;
-  }
-  return hash >>> 0;
 }
 
 const seatMapCache = new Map();

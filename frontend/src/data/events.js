@@ -57,7 +57,18 @@ function buildSessionsForEvent(eventId) {
     );
   }
 
-  return sessions.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  sessions.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+
+  // Самый дальний сеанс у событий с четырьмя и более сеансами — без
+  // продаж: так бывает у только что открытых дат, и админке нужен сеанс, у
+  // которого ещё можно сменить схему зала. Без вызова random, чтобы не
+  // сдвинуть остальной каталог.
+  const last = sessions[sessions.length - 1];
+  if (!soldOutEvent && sessions.length >= 4 && last.status === 'active') {
+    last.seats_left = last.total_seats;
+  }
+
+  return sessions;
 }
 
 function summarize(event, sessions) {
