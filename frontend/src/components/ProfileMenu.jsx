@@ -1,13 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/useAuth.js';
 import styles from './ProfileMenu.module.css';
 
 // Разделы, куда гостя не пускают: после выхода оставаться на них незачем.
-const PROTECTED_PREFIXES = ['/favorites', '/account'];
+const PROTECTED_PREFIXES = ['/favorites', '/account', '/admin'];
 
 export default function ProfileMenu() {
   const email = useAuth((s) => s.user?.email ?? '');
+  const isAdmin = useAuth((s) => s.user?.role === 'admin');
   const logout = useAuth((s) => s.logout);
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,6 +76,14 @@ export default function ProfileMenu() {
             <span className={styles.whoLabel}>Вы вошли как</span>
             <span className={styles.email}>{email}</span>
           </div>
+          {isAdmin && (
+            <Link to="/admin" className={styles.item}>
+              <span className={styles.itemGlyph} aria-hidden="true">
+                ⚙
+              </span>
+              Админка
+            </Link>
+          )}
           <button type="button" className={styles.item} onClick={onLogout}>
             <span className={styles.itemGlyph} aria-hidden="true">
               ⇥

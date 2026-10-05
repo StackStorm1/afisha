@@ -1,4 +1,4 @@
-import { Routes, Route, useParams } from 'react-router-dom';
+import { Navigate, Routes, Route, useParams } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import HomePage from './pages/HomePage.jsx';
 import EventPage from './pages/EventPage.jsx';
@@ -6,6 +6,10 @@ import AuthPage from './pages/AuthPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import FavoritesPage from './pages/FavoritesPage.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
+import RequireAdmin from './components/RequireAdmin.jsx';
+import AdminLayout from './pages/admin/AdminLayout.jsx';
+import AdminEventsPage from './pages/admin/AdminEventsPage.jsx';
+import AdminVenuesPage from './pages/admin/AdminVenuesPage.jsx';
 
 // key={eventId}: без него React Router переиспользует тот же экземпляр
 // EventPage при переходе между двумя событиями (например, по клику на
@@ -42,6 +46,18 @@ export default function App() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminLayout />
+            </RequireAdmin>
+          }
+        >
+          <Route index element={<Navigate to="events" replace />} />
+          <Route path="events" element={<AdminEventsPage />} />
+          <Route path="venues" element={<AdminVenuesPage />} />
+        </Route>
       </Routes>
     </>
   );

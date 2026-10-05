@@ -1,0 +1,115 @@
+/* Админка рассчитана на десктоп: макет есть только для 1440px. На узком
+   экране колонка навигации уходит наверх, чтобы ничего не обрезалось. */
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+}
+
+.aside {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  border-right: 1px solid var(--color-border);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+  padding: 4px 10px 18px;
+}
+
+.logo:hover {
+  color: var(--color-ink);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.navItem {
+  height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  color: var(--color-ink-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  transition: background 0.14s;
+}
+
+.navItem:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.navItem:global(.active) {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.toSite {
+  margin-top: auto;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  color: var(--color-ink-muted);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toSite:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-ink);
+}
+
+.main {
+  padding: 28px 40px 40px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aside {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .logo {
+    padding: 4px 10px;
+  }
+
+  .nav {
+    flex-direction: row;
+  }
+
+  .toSite {
+    margin-top: 0;
+    margin-left: auto;
+  }
+
+  .main {
+    padding: 24px 16px 40px;
+  }
+}

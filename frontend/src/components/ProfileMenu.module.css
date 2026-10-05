@@ -81,6 +81,7 @@
 
 .item:hover {
   background: var(--color-surface-hover);
+  color: var(--color-ink);
 }
 
 .itemGlyph {

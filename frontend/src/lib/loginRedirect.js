@@ -7,6 +7,7 @@ export const LOGIN_REASONS = {
   favorite: 'Войдите, чтобы сохранить в избранное',
   orders: 'Войдите, чтобы увидеть свои заказы',
   favorites: 'Войдите, чтобы открыть избранное',
+  admin: 'Войдите как администратор',
 };
 
 const AUTH_PATHS = ['/login', '/register'];
