@@ -139,6 +139,7 @@ export default function EventPage() {
                   key={day.iso}
                   type="button"
                   className={styles.dateChip}
+                  data-date={day.iso}
                   data-active={day.active}
                   data-empty={day.soldOut}
                   onClick={() => setSelectedDay(day.iso)}
