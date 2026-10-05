@@ -356,9 +356,7 @@ async def cancel_order(db: AsyncSession, order_id: UUID, user: User) -> OrderDet
 
     refreshed = (
         await db.execute(
-            select(Order)
-            .where(Order.id == order.id)
-            .options(*_load_options())
+            select(Order).where(Order.id == order.id).options(*_load_options())
         )
     ).scalar_one()
     return _build_order_detail(refreshed)
