@@ -1,14 +1,13 @@
 import { Link } from 'react-router-dom';
 import PosterImage from './PosterImage.jsx';
 import { useHero } from '../lib/useHero.js';
-import { useFavorites } from '../store/useFavorites.js';
+import { useFavoriteToggle } from '../lib/useFavoriteToggle.js';
 import { formatTime } from '../lib/format.js';
 import styles from './Hero.module.css';
 
 export default function Hero() {
   const { featured, side } = useHero();
-  const isFavorite = useFavorites((s) => (featured ? s.isFavorite(featured.id) : false));
-  const toggleFavorite = useFavorites((s) => s.toggle);
+  const { isFavorite, toggle: toggleFavorite } = useFavoriteToggle(featured?.id);
 
   if (!featured) return null;
 
@@ -35,7 +34,7 @@ export default function Hero() {
               aria-label={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
               onClick={(e) => {
                 e.preventDefault();
-                toggleFavorite(featured.id);
+                toggleFavorite();
               }}
             >
               {isFavorite ? '♥' : '♡'}

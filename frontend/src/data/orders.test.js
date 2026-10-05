@@ -12,6 +12,7 @@ import {
   MAX_SEATS_PER_ORDER,
 } from './orders.js';
 import { expectOrderDetail, expectPagination } from './schemaAssertions.js';
+import { DEMO_USER } from './auth.js';
 
 function freeSession(minFreeSeats = 2) {
   const events = listEvents({ per_page: 200 }).data;
@@ -254,6 +255,40 @@ describe('orders mock — отмена и список заказов (US-15, US
     expect(rebooked.seats[0].id).toBe(seatId);
   });
 
+  it('оплаченный заказ отменяется, места освобождаются (US-17)', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    payOrder(order.id, { outcome: 'success' });
+
+    expect(cancelOrder(order.id).status).toBe('cancelled');
+  });
+
+  it('заказ с ошибкой оплаты отменить нельзя — ORDER_NOT_CANCELLABLE', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
+    expect(() => payOrder(order.id, { outcome: 'fail' })).toThrow();
+
+    expect(() => cancelOrder(order.id)).toThrow(
+      expect.objectContaining({ code: 'ORDER_NOT_CANCELLABLE' })
+    );
+    expect(getOrder(order.id).status).toBe('failed');
+  });
+
+  it('чужой заказ — ORDER_NOT_FOUND, статус не меняется (BR-07)', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({
+      sessionId: session.id,
+      seatIds: [freeSeats[0].id],
+      userId: 'owner',
+    });
+
+    expect(() => cancelOrder(order.id, { userId: 'someone-else' })).toThrow(
+      expect.objectContaining({ code: 'ORDER_NOT_FOUND' })
+    );
+    expect(getOrder(order.id).status).toBe('pending');
+    expect(cancelOrder(order.id, { userId: 'owner' }).status).toBe('cancelled');
+  });
+
   it('повторная отмена уже отменённого заказа — ORDER_NOT_CANCELLABLE', () => {
     const { session, freeSeats } = freeSession();
     const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });
@@ -279,10 +314,45 @@ describe('orders mock — отмена и список заказов (US-15, US
       expect(o.status).toBe('pending');
     }
   });
+
+  it('listMyOrders отдаёт только заказы текущего пользователя', () => {
+    const { session, freeSeats } = freeSession(2);
+    const mine = createOrder({
+      sessionId: session.id,
+      seatIds: [freeSeats[0].id],
+      userId: 'user-a',
+    });
+    const theirs = createOrder({
+      sessionId: session.id,
+      seatIds: [freeSeats[1].id],
+      userId: 'user-b',
+    });
+
+    const ids = listMyOrders({ userId: 'user-a' }).data.map((o) => o.id);
+    expect(ids).toContain(mine.id);
+    expect(ids).not.toContain(theirs.id);
+    expect(listMyOrders({ userId: 'user-c' }).data).toEqual([]);
+  });
+
+  it('у демо-аккаунта есть заказы во всех четырёх статусах, предстоящие и прошедшие', () => {
+    const { data } = listMyOrders({ userId: DEMO_USER.id, per_page: 100 });
+    for (const o of data) expectOrderDetail(o);
+
+    expect(new Set(data.map((o) => o.status))).toEqual(
+      new Set(['paid', 'pending', 'failed', 'cancelled'])
+    );
+    const now = new Date();
+    expect(data.some((o) => new Date(o.session.starts_at) > now)).toBe(true);
+    expect(data.some((o) => new Date(o.session.starts_at) < now)).toBe(true);
+    // Повторный запрос не дублирует демо-заказы.
+    expect(listMyOrders({ userId: DEMO_USER.id, per_page: 100 }).data).toHaveLength(
+      data.length
+    );
+  });
 });
 
 describe('orders mock — фоновое истечение броней (BR-02, requirements.md §7)', () => {
-  it('протухшая неоплаченная бронь освобождается без вызова оплаты', () => {
+  it('истёкшая неоплаченная бронь освобождается без вызова оплаты', () => {
     const { session, freeSeats } = freeSession();
     const seatId = freeSeats[0].id;
     const order = createOrder({ sessionId: session.id, seatIds: [seatId] });

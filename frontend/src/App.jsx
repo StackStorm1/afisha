@@ -2,6 +2,10 @@ import { Routes, Route, useParams } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import HomePage from './pages/HomePage.jsx';
 import EventPage from './pages/EventPage.jsx';
+import AuthPage from './pages/AuthPage.jsx';
+import OrdersPage from './pages/OrdersPage.jsx';
+import FavoritesPage from './pages/FavoritesPage.jsx';
+import RequireAuth from './components/RequireAuth.jsx';
 
 // key={eventId}: без него React Router переиспользует тот же экземпляр
 // EventPage при переходе между двумя событиями (например, по клику на
@@ -20,6 +24,24 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/events/:eventId" element={<EventPageRoute />} />
+        <Route path="/login" element={<AuthPage key="login" mode="login" />} />
+        <Route path="/register" element={<AuthPage key="register" mode="register" />} />
+        <Route
+          path="/favorites"
+          element={
+            <RequireAuth reason="favorites">
+              <FavoritesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/account/orders"
+          element={
+            <RequireAuth reason="orders">
+              <OrdersPage />
+            </RequireAuth>
+          }
+        />
       </Routes>
     </>
   );
