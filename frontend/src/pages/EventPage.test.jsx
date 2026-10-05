@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
 import EventPage from './EventPage.jsx';
 import { listEvents, listEventSessions } from '../data/events.js';
-import { formatMonthShort, formatTime } from '../lib/format.js';
+import { formatTime } from '../lib/format.js';
 import { addDaysIso, todayIso } from '../lib/dateStrip.js';
 
 const catalog = listEvents({ per_page: 500 }).data;
@@ -42,11 +42,10 @@ describe('EventPage — лента дат достаёт до дальних с�
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at))[0];
     const farDate = farSession.starts_at.slice(0, 10);
 
-    renderEvent(event.id);
+    const { container } = renderEvent(event.id);
 
-    const strip = screen.getByRole('button', {
-      name: new RegExp(`${Number(farDate.slice(8, 10))}\\s*${formatMonthShort(farDate)}`),
-    });
+    const strip = container.querySelector(`[data-date="${farDate}"]`);
+    expect(strip).not.toBeNull();
     await user.click(strip);
 
     // Время дальнего сеанса в списке — значит день реально выбран.
