@@ -1,11 +1,18 @@
 import { deriveCardBadge } from './cardBadge.js';
 import { formatSessionWhen } from './format.js';
+import { listEventSessions } from '../data/events.js';
 
 export function sessionInRange(session, date_from, date_to) {
   if (session.status !== 'active') return false;
   if (date_from && session.starts_at < `${date_from}T00:00:00Z`) return false;
   if (date_to && session.starts_at > `${date_to}T23:59:59Z`) return false;
   return true;
+}
+
+export function nearestActiveSession(eventId) {
+  const sessions = listEventSessions(eventId).filter((s) => s.status === 'active');
+  if (sessions.length === 0) return null;
+  return sessions.reduce((min, s) => (s.starts_at < min.starts_at ? s : min));
 }
 
 // Общая форма карточки каталога — используется лентой, подборками, героем
