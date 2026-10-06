@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { createDraft, draftReducer, LIMITS } from './layoutDraft.js';
-import { rectShape, sectionCapacity } from './hallLayout.js';
+import {
+  createDraft,
+  draftReducer,
+  drawRect,
+  fitRect,
+  LIMITS,
+  moveRect,
+  resizeRect,
+} from './layoutDraft.js';
+import { rectShape, sectionCapacity, shapeRect } from './hallLayout.js';
 
 const LAYOUT = {
   id: 'l1',
@@ -175,5 +183,107 @@ describe('черновик конфигурации', () => {
     state = draftReducer(state, { type: 'published', layout: state.layout });
     expect(state.dirty).toBe(false);
     expect(section(state, 'd').name).toBe('Партер');
+  });
+});
+
+const CANVAS = { width: 840, height: 640 };
+
+describe('геометрия секторов на холсте', () => {
+  it('координаты и размер привязываются к сетке 10', () => {
+    expect(fitRect({ x: 203, y: 377, width: 444, height: 186 }, CANVAS)).toEqual({
+      x: 200,
+      y: 380,
+      width: 440,
+      height: 190,
+    });
+  });
+
+  it('сектор не уходит за край холста и не теряет размер у края', () => {
+    const rect = { x: 600, y: 120, width: 200, height: 220 };
+    expect(moveRect(rect, 100, -500, CANVAS)).toEqual({ ...rect, x: 640, y: 0 });
+  });
+
+  it('угол тянется, противоположный стоит на месте', () => {
+    const rect = { x: 200, y: 380, width: 440, height: 180 };
+    expect(resizeRect(rect, 'nw', { x: 151, y: 349 }, CANVAS)).toEqual({
+      x: 150,
+      y: 350,
+      width: 490,
+      height: 210,
+    });
+    expect(resizeRect(rect, 'se', { x: 500, y: 600 }, CANVAS)).toEqual({
+      x: 200,
+      y: 380,
+      width: 300,
+      height: 220,
+    });
+  });
+
+  it('ручку нельзя протащить через противоположный угол', () => {
+    const rect = { x: 200, y: 380, width: 440, height: 180 };
+    expect(resizeRect(rect, 'se', { x: 0, y: 0 }, CANVAS)).toEqual({
+      x: 200,
+      y: 380,
+      width: 40,
+      height: 40,
+    });
+  });
+
+  it('новый сектор рисуется в любую сторону от точки нажатия', () => {
+    expect(drawRect({ x: 500, y: 400 }, { x: 302, y: 248 }, CANVAS)).toEqual({
+      x: 300,
+      y: 250,
+      width: 200,
+      height: 150,
+    });
+  });
+});
+
+describe('положение сектора в черновике', () => {
+  it('setRect перестраивает контур по сетке', () => {
+    const state = draftReducer(createDraft(LAYOUT), {
+      type: 'setRect',
+      id: 'b',
+      rect: { x: 104, y: 396, width: 520, height: 200 },
+    });
+    expect(shapeRect(section(state, 'b').shape)).toEqual({
+      x: 100,
+      y: 400,
+      width: 520,
+      height: 200,
+    });
+    expect(state.dirty).toBe(true);
+  });
+
+  it('клик без сдвига не считается правкой', () => {
+    const draft = createDraft(LAYOUT);
+    const state = draftReducer(draft, {
+      type: 'setRect',
+      id: 'b',
+      rect: { x: 202, y: 381, width: 440, height: 180 },
+    });
+    expect(state).toBe(draft);
+  });
+
+  it('нарисованная стоячая зона получает прямоугольник, вместимость и зону', () => {
+    const state = draftReducer(createDraft(LAYOUT), {
+      type: 'addSection',
+      id: 'new',
+      kind: 'standing',
+      rect: { x: 41, y: 302, width: 158, height: 99 },
+    });
+    expect(section(state, 'new')).toMatchObject({
+      name: 'Стоячая зона 3',
+      kind: 'standing',
+      capacity: 300,
+      price_zone_id: 'vip',
+    });
+    expect(shapeRect(section(state, 'new').shape)).toEqual({
+      x: 40,
+      y: 300,
+      width: 160,
+      height: 100,
+    });
+    expect(state.selectedId).toBe('new');
   });
 });

@@ -174,6 +174,8 @@ function Editor({ initial }) {
           layout={layout}
           selectedId={selectedId}
           onSelect={(id) => dispatch({ type: 'select', id })}
+          onChangeRect={(id, rect) => edit({ type: 'setRect', id, rect })}
+          onCreate={(kind, rect) => edit({ type: 'addSection', id: uuid(), kind, rect })}
         />
 
         <div className={styles.props}>

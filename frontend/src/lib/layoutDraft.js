@@ -1,4 +1,4 @@
-import { rectShape, sectionCapacity } from './hallLayout.js';
+import { rectShape, sectionCapacity, shapeRect } from './hallLayout.js';
 
 // Черновик конфигурации зала в редакторе. Все правки идут через редьюсер,
 // на сервер черновик уходит целиком по «Опубликовать». Места в черновике
@@ -15,6 +15,81 @@ export const LIMITS = {
 const NEW_SECTION_RECT = { x: 320, y: 230, width: 200, height: 180 };
 const NEW_SECTION_ROWS = 6;
 const NEW_SECTION_SEATS = 12;
+const NEW_STANDING_CAPACITY = 300;
+
+// Сетка холста: координаты и размеры секторов кратны шагу, так сектора
+// легко выровнять друг с другом. Меньше минимального размера сектор не
+// сжимается: в него перестают влезать название и хотя бы один ряд.
+export const GRID = 10;
+export const MIN_SECTION_SIZE = 40;
+
+export function snap(value) {
+  return Math.round(value / GRID) * GRID;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+// Прямоугольник на сетке и целиком на холсте. Сначала размер (не больше
+// холста), потом положение — чтобы сектор у края не терял размер.
+export function fitRect({ x, y, width, height }, canvas) {
+  const w = clamp(snap(width), MIN_SECTION_SIZE, canvas.width);
+  const h = clamp(snap(height), MIN_SECTION_SIZE, canvas.height);
+  return {
+    x: clamp(snap(x), 0, canvas.width - w),
+    y: clamp(snap(y), 0, canvas.height - h),
+    width: w,
+    height: h,
+  };
+}
+
+export function moveRect(rect, dx, dy, canvas) {
+  return fitRect({ ...rect, x: rect.x + dx, y: rect.y + dy }, canvas);
+}
+
+// Изменение размера за угловую ручку: противоположный угол стоит на месте,
+// перетащить ручку через него нельзя — сектор упирается в минимум.
+// corner — 'nw' | 'ne' | 'sw' | 'se'.
+export function resizeRect(rect, corner, point, canvas) {
+  const px = clamp(snap(point.x), 0, canvas.width);
+  const py = clamp(snap(point.y), 0, canvas.height);
+  let left = rect.x;
+  let right = rect.x + rect.width;
+  let top = rect.y;
+  let bottom = rect.y + rect.height;
+  if (corner.includes('w')) left = Math.min(px, right - MIN_SECTION_SIZE);
+  else right = Math.max(px, left + MIN_SECTION_SIZE);
+  if (corner.includes('n')) top = Math.min(py, bottom - MIN_SECTION_SIZE);
+  else bottom = Math.max(py, top + MIN_SECTION_SIZE);
+  return fitRect({ x: left, y: top, width: right - left, height: bottom - top }, canvas);
+}
+
+// Новый сектор, нарисованный от точки нажатия до текущей в любую сторону.
+// Рамку меньше минимума fitRect доращивает до минимального размера.
+export function drawRect(start, point, canvas) {
+  const x1 = snap(start.x);
+  const y1 = snap(start.y);
+  const x2 = snap(point.x);
+  const y2 = snap(point.y);
+  return fitRect(
+    {
+      x: Math.min(x1, x2),
+      y: Math.min(y1, y2),
+      width: Math.abs(x2 - x1),
+      height: Math.abs(y2 - y1),
+    },
+    canvas
+  );
+}
+
+function canvasOf(layout) {
+  return { width: layout.canvas_width, height: layout.canvas_height };
+}
+
+function sameRect(a, b) {
+  return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+}
 
 function clampInt(value, max) {
   const n = Math.floor(Number(value));
@@ -114,11 +189,11 @@ function setKind(state, section, kind) {
   };
 }
 
-function nextSectionName(sections) {
+function nextSectionName(sections, prefix) {
   const names = new Set(sections.map((s) => s.name));
   let n = sections.length + 1;
-  while (names.has(`Сектор ${n}`)) n += 1;
-  return `Сектор ${n}`;
+  while (names.has(`${prefix} ${n}`)) n += 1;
+  return `${prefix} ${n}`;
 }
 
 export function draftReducer(state, action) {
@@ -181,25 +256,51 @@ export function draftReducer(state, action) {
         },
       }));
 
+    // Сектор из «+ Сектор» встаёт в центр холста; нарисованный на холсте
+    // приходит со своим прямоугольником и типом.
     case 'addSection': {
       const { sections } = state.layout;
-      const section = {
+      const standing = action.kind === 'standing';
+      const base = {
         id: action.id,
-        name: nextSectionName(sections),
-        kind: 'seated',
-        shape: rectShape(NEW_SECTION_RECT),
-        sort_order: sections.reduce((max, s) => Math.max(max, s.sort_order), 0) + 1,
-        generator: seatedGenerator(
-          NEW_SECTION_ROWS,
-          NEW_SECTION_SEATS,
-          firstZoneId(state.layout)
+        name: nextSectionName(sections, standing ? 'Стоячая зона' : 'Сектор'),
+        shape: rectShape(
+          fitRect(action.rect ?? NEW_SECTION_RECT, canvasOf(state.layout))
         ),
+        sort_order: sections.reduce((max, s) => Math.max(max, s.sort_order), 0) + 1,
       };
+      const section = standing
+        ? {
+            ...base,
+            kind: 'standing',
+            capacity: NEW_STANDING_CAPACITY,
+            price_zone_id: firstZoneId(state.layout),
+          }
+        : {
+            ...base,
+            kind: 'seated',
+            generator: seatedGenerator(
+              NEW_SECTION_ROWS,
+              NEW_SECTION_SEATS,
+              firstZoneId(state.layout)
+            ),
+          };
       return {
         layout: { ...state.layout, sections: [...sections, section] },
         selectedId: section.id,
         dirty: true,
       };
+    }
+
+    // Новое положение и размер сектора. Прямоугольник приводится к сетке и
+    // холсту здесь же, чтобы мышь и клавиатура не разошлись в правилах.
+    // Если ничего не сдвинулось (клик без перетаскивания), это не правка.
+    case 'setRect': {
+      const section = state.layout.sections.find((s) => s.id === action.id);
+      if (!section) return state;
+      const rect = fitRect(action.rect, canvasOf(state.layout));
+      if (sameRect(rect, shapeRect(section.shape))) return state;
+      return mapSection(state, action.id, (s) => ({ ...s, shape: rectShape(rect) }));
     }
 
     case 'removeSection': {

@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App.jsx';
 import { useAuth } from '../../store/useAuth.js';
 import { DEMO_ADMIN } from '../../data/auth.js';
@@ -11,6 +11,7 @@ import {
   getLayout,
   listVenueLayouts,
 } from '../../data/hallLayouts.js';
+import { shapeRect } from '../../lib/hallLayout.js';
 
 const STADIUM = VENUES.find((v) => v.name === 'Adrenaline Stadium');
 
@@ -141,5 +142,99 @@ describe('редактор схемы', () => {
     );
     await user.click(screen.getByRole('link', { name: 'Сидячий партер' }));
     expect(screen.getByText(/Adrenaline Stadium \/ Сидячий партер/)).toBeInTheDocument();
+  });
+});
+
+// В jsdom нет PointerEvent, и без него события холста приходят без
+// координат. Для тестов хватает MouseEvent с pointerId.
+if (typeof window.PointerEvent === 'undefined') {
+  window.PointerEvent = class PointerEvent extends MouseEvent {
+    constructor(type, init = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 1;
+    }
+  };
+}
+
+// Холст 840 × 640 занимает блок того же размера: экранные координаты
+// совпадают с координатами холста.
+function canvasSvg() {
+  const svg = screen.getByRole('application').querySelector('svg');
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 840,
+    height: 640,
+  });
+  return svg;
+}
+
+function drag(target, svg, from, to) {
+  fireEvent.pointerDown(target, {
+    button: 0,
+    pointerId: 1,
+    clientX: from[0],
+    clientY: from[1],
+  });
+  fireEvent.pointerMove(svg, { pointerId: 1, clientX: to[0], clientY: to[1] });
+  fireEvent.pointerUp(svg, { pointerId: 1, clientX: to[0], clientY: to[1] });
+}
+
+describe('холст редактора', () => {
+  it('стрелки двигают выбранный сектор, Shift со стрелками меняет размер', async () => {
+    const user = userEvent.setup();
+    renderEditor('Клубная');
+    screen.getByRole('application').focus();
+    await user.keyboard('{ArrowRight}{ArrowDown}');
+    expect(screen.getByText('Танцпол: x 210, y 130, 440 × 260')).toBeInTheDocument();
+    await user.keyboard('{Shift>}{ArrowLeft}{ArrowUp}{/Shift}');
+    expect(screen.getByText('Танцпол: x 210, y 130, 430 × 250')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Опубликовать' })).toBeEnabled();
+  });
+
+  it('сектор перетаскивается мышью с привязкой к сетке', async () => {
+    renderEditor('Танцпол + трибуны');
+    const svg = canvasSvg();
+    const label = within(svg).getByText('Сектор B');
+    drag(label, svg, [400, 450], [323, 404]);
+    expect(sectorButton('Сектор B')).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Опубликовать' }));
+    const b = getLayout(layoutId('Танцпол + трибуны')).data.sections.find(
+      (s) => s.name === 'Сектор B'
+    );
+    expect(shapeRect(b.shape)).toMatchObject({ x: 120, y: 330 });
+  });
+
+  it('угловая ручка меняет размер, места перестраиваются', () => {
+    renderEditor('Танцпол + трибуны');
+    fireEvent.click(sectorButton('Сектор B'));
+    const svg = canvasSvg();
+    const seats = () => [...svg.querySelectorAll('[data-section] rect')];
+    const before = seats().map((r) => r.getAttribute('x'));
+    const handle = svg.querySelector('[data-corner="se"] rect');
+    drag(handle, svg, [640, 560], [500, 620]);
+    const after = seats().map((r) => r.getAttribute('x'));
+    expect(after).toHaveLength(before.length);
+    expect(after).not.toEqual(before);
+    expect(sectorButton('Сектор B')).toHaveTextContent('12 рядов · 360 мест');
+    expect(screen.getByText(/· черновик/)).toBeInTheDocument();
+  });
+
+  it('инструмент «Стоячая зона» рисует новую зону и возвращает «Выбор»', async () => {
+    const user = userEvent.setup();
+    renderEditor('Клубная');
+    await user.click(screen.getByRole('button', { name: 'Стоячая зона' }));
+    expect(screen.getByRole('button', { name: 'Стоячая зона' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    const svg = canvasSvg();
+    drag(svg, svg, [20, 600], [200, 630]);
+    expect(sectorButton('Стоячая зона 2')).toHaveAttribute('aria-pressed', 'true');
+    expect(sectorButton('Стоячая зона 2')).toHaveTextContent('стоячая · 300');
+    expect(screen.getByRole('button', { name: 'Выбор' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 });

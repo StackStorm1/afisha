@@ -1,3 +1,61 @@
+.column {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tools {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+/* Кнопка 32px по макету, зона нажатия добирается до 44px псевдоэлементом. */
+.tool {
+  position: relative;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-interface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tool::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
+.tool:hover {
+  background: var(--color-surface-hover);
+}
+
+.tool[aria-pressed='true'] {
+  background: #1a1a24;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.grid {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
+
 .canvas {
   position: relative;
   flex: 1;
@@ -12,15 +70,27 @@
   overflow: hidden;
 }
 
+.canvas:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.canvas[data-tool='seated'],
+.canvas[data-tool='standing'] {
+  cursor: crosshair;
+}
+
 .svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  touch-action: none;
+  user-select: none;
 }
 
-.section {
-  cursor: pointer;
+.canvas[data-tool='select'] .section {
+  cursor: move;
 }
 
 .label {
@@ -36,4 +106,28 @@
   font-family: var(--font-display);
   font-size: 13px;
   letter-spacing: 0.3em;
+}
+
+.draft {
+  fill: rgba(140, 136, 255, 0.12);
+  stroke: #8c88ff;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
+.draft[data-kind='standing'] {
+  fill: rgba(140, 136, 255, 0.28);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
