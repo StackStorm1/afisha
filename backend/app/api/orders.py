@@ -13,7 +13,7 @@ from app.schemas.orders import (
     OrderStatus,
 )
 from app.services import orders as orders_service
-from app.stubs.fixtures import ORDER, PAGINATION
+from app.stubs.fixtures import ORDER
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -63,13 +63,18 @@ async def create_order(
     },
 )
 async def list_orders(
+    db: DbSession,
+    user: Annotated[User, Depends(current_user)],
     status: OrderStatus | None = Query(None, description="Фильтр по статусу брони"),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
 ):
+    items, pagination = await orders_service.list_orders(
+        db, user, order_status=status, page=page, per_page=per_page
+    )
     return {
-        "data": [ORDER.model_dump(mode="json")],
-        "pagination": PAGINATION.model_dump(mode="json"),
+        "data": [o.model_dump(mode="json") for o in items],
+        "pagination": pagination.model_dump(),
     }
 
 
@@ -87,8 +92,13 @@ async def list_orders(
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
 )
-async def get_order(id: UUID):
-    return {"data": ORDER.model_dump(mode="json")}
+async def get_order(
+    id: UUID,
+    db: DbSession,
+    user: Annotated[User, Depends(current_user)],
+):
+    order = await orders_service.get_order(db, id, user)
+    return {"data": order.model_dump(mode="json")}
 
 
 @router.delete(
@@ -106,8 +116,13 @@ async def get_order(id: UUID):
         500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
     },
 )
-async def cancel_order(id: UUID):
-    return {"data": ORDER.model_dump(mode="json")}
+async def cancel_order(
+    id: UUID,
+    db: DbSession,
+    user: Annotated[User, Depends(current_user)],
+):
+    order = await orders_service.cancel_order(db, id, user)
+    return {"data": order.model_dump(mode="json")}
 
 
 @router.post(
