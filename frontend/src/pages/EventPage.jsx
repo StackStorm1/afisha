@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
 import PosterImage from '../components/PosterImage.jsx';
@@ -8,7 +8,9 @@ import { getBalconyStartRow } from '../data/seatMap.js';
 import { useEventDateStrip } from '../lib/useEventSessions.js';
 import { buildSessionRowView } from '../lib/sessionRowView.js';
 import { getSessionZones, ZONE_LABELS } from '../lib/cardBadge.js';
-import { useFavorites } from '../store/useFavorites.js';
+import { useFavoriteToggle } from '../lib/useFavoriteToggle.js';
+import { useAuth } from '../store/useAuth.js';
+import { loginState } from '../lib/loginRedirect.js';
 import {
   formatDuration,
   formatPrice,
@@ -19,9 +21,6 @@ import {
 } from '../lib/format.js';
 import styles from './EventPage.module.css';
 
-// Состояние авторизации приходит снаружи — стора авторизации ещё нет,
-// см. Header.jsx.
-const AUTHORIZED = false;
 const DESCRIPTION_CLAMP_THRESHOLD = 180;
 
 function nextOpenSession(activeSessions) {
@@ -36,14 +35,22 @@ export default function EventPage() {
   const { eventId } = useParams();
   const event = getEvent(eventId);
   const [expanded, setExpanded] = useState(false);
-  const isFavorite = useFavorites((s) => (event ? s.isFavorite(event.id) : false));
-  const toggleFavorite = useFavorites((s) => s.toggle);
+  const authorized = useAuth((s) => s.status === 'visitor');
+  const { isFavorite, toggle: onFavoriteClick } = useFavoriteToggle(event?.id);
+  const location = useLocation();
   const { days, setSelectedDay, daySessions, allSessions } = useEventDateStrip(eventId);
+
+  // После входа с «Выбрать места» пользователь возвращается к списку
+  // сеансов (#sessions). Роутер к якорю сам не прокручивает.
+  useEffect(() => {
+    if (location.hash !== '#sessions') return;
+    document.getElementById('sessions')?.scrollIntoView({ block: 'start' });
+  }, [location.hash]);
 
   if (!event) {
     return (
       <>
-        <Header authorized={AUTHORIZED} />
+        <Header />
         <main className={styles.main}>
           <div className={styles.notFound}>
             <h1 className="u-poster">Событие не найдено</h1>
@@ -55,9 +62,16 @@ export default function EventPage() {
     );
   }
 
+  // Схемы зала ещё нет, поэтому после входа ведём к списку сеансов этого
+  // события, а не на несуществующую страницу выбора мест.
+  const seatsLoginState = loginState(
+    { pathname: location.pathname, search: location.search, hash: '#sessions' },
+    'seats'
+  );
+
   const activeSessions = allSessions.filter((s) => s.status === 'active');
   const next = nextOpenSession(activeSessions);
-  const nextView = next ? buildSessionRowView(next, { authorized: AUTHORIZED }) : null;
+  const nextView = next ? buildSessionRowView(next, { authorized }) : null;
 
   const openPrices = activeSessions
     .map((s) => {
@@ -87,7 +101,7 @@ export default function EventPage() {
 
   return (
     <>
-      <Header authorized={AUTHORIZED} />
+      <Header />
       <main className={styles.main}>
         <nav className={styles.breadcrumb} aria-label="Хлебные крошки">
           <Link to="/" className={styles.breadcrumbLink}>
@@ -139,8 +153,13 @@ export default function EventPage() {
                   key={day.iso}
                   type="button"
                   className={styles.dateChip}
+                  data-date={day.iso}
                   data-active={day.active}
                   data-empty={day.soldOut}
+                  // Месяц виден только у первого чипа и при смене месяца —
+                  // для экранного диктора дата нужна целиком.
+                  aria-label={`${day.dow}, ${day.num} ${day.month}${day.label ? `, ${day.label}` : ''}`}
+                  aria-pressed={day.active}
                   onClick={() => setSelectedDay(day.iso)}
                 >
                   <span className={styles.dateDow}>{day.dow}</span>
@@ -157,7 +176,7 @@ export default function EventPage() {
 
             <div className={styles.sessionList}>
               {daySessions.map((session) => {
-                const view = buildSessionRowView(session, { authorized: AUTHORIZED });
+                const view = buildSessionRowView(session, { authorized });
                 return (
                   <div key={session.id} className={styles.sessionRow}>
                     <div className={styles.sessionTime}>
@@ -183,8 +202,11 @@ export default function EventPage() {
                         to={
                           view.sold
                             ? '#'
-                            : `/events/${event.id}/sessions/${session.id}/seats`
+                            : authorized
+                              ? `/events/${event.id}/sessions/${session.id}/seats`
+                              : '/login'
                         }
+                        state={!view.sold && !authorized ? seatsLoginState : undefined}
                         className={styles.sessionButton}
                         data-disabled={view.sold}
                         aria-disabled={view.sold}
@@ -198,17 +220,25 @@ export default function EventPage() {
               })}
             </div>
 
-            {!AUTHORIZED && (
+            {!authorized && (
               <div className={styles.guestBanner}>
                 <span className={styles.guestBannerText}>
                   Схему зала можно посмотреть без входа. Чтобы удержать места и оплатить,
                   нужен аккаунт.
                 </span>
                 <div className={styles.guestBannerActions}>
-                  <Link to="/register" className={styles.readMoreButton}>
+                  <Link
+                    to="/register"
+                    state={seatsLoginState}
+                    className={styles.readMoreButton}
+                  >
                     Зарегистрироваться
                   </Link>
-                  <Link to="/login" className={styles.sessionButton}>
+                  <Link
+                    to="/login"
+                    state={seatsLoginState}
+                    className={styles.sessionButton}
+                  >
                     Войти
                   </Link>
                 </div>
@@ -234,9 +264,15 @@ export default function EventPage() {
                 </span>
               </div>
               <div className={styles.asideActions}>
-                <a href="#sessions" className={styles.asideCta}>
-                  {AUTHORIZED ? 'Выбрать места' : 'Войти и купить'}
-                </a>
+                {authorized ? (
+                  <a href="#sessions" className={styles.asideCta}>
+                    Выбрать места
+                  </a>
+                ) : (
+                  <Link to="/login" state={seatsLoginState} className={styles.asideCta}>
+                    Войти и купить
+                  </Link>
+                )}
                 <button
                   type="button"
                   className={styles.asideFavorite}
@@ -245,7 +281,7 @@ export default function EventPage() {
                   aria-label={
                     isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'
                   }
-                  onClick={() => toggleFavorite(event.id)}
+                  onClick={onFavoriteClick}
                 >
                   {isFavorite ? '♥' : '♡'}
                 </button>

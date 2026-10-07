@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useFiltersStore } from '../store/useFiltersStore.js';
 import { useFavorites } from '../store/useFavorites.js';
+import { useAuth } from '../store/useAuth.js';
+import ProfileMenu from './ProfileMenu.jsx';
 import { useSearchSuggestions } from '../lib/useSearchSuggestions.js';
 import CatalogFilters from './CatalogFilters.jsx';
 import styles from './Header.module.css';
 
-// Состояние авторизации приходит снаружи — стора авторизации ещё нет,
-// по умолчанию вид гостя. showFilters включается только на страницах с лентой
-// каталога: панель фильтров без ленты ничего не фильтрует.
-export default function Header({ authorized = false, showFilters = false }) {
+// showFilters включается только на страницах с лентой каталога: панель
+// фильтров без ленты ничего не фильтрует.
+export default function Header({ showFilters = false }) {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const blurTimeout = useRef(null);
@@ -18,6 +19,7 @@ export default function Header({ authorized = false, showFilters = false }) {
   const setQuery = useFiltersStore((s) => s.setQuery);
   const toggleVenue = useFiltersStore((s) => s.toggleVenue);
 
+  const authStatus = useAuth((s) => s.status);
   const favCount = useFavorites((s) => s.ids.size);
   const suggestionGroups = useSearchSuggestions(q);
 
@@ -90,20 +92,21 @@ export default function Header({ authorized = false, showFilters = false }) {
         </div>
 
         <div className={styles.actions}>
-          <Link to="/favorites" className={styles.ghostButton}>
-            <span>♡</span> Избранное{' '}
-            {favCount > 0 && <span className={styles.favCount}>{favCount}</span>}
-          </Link>
-          {authorized ? (
+          {authStatus === 'visitor' && (
             <>
-              <Link to="/account/orders" className={styles.ghostButton}>
-                <span>▤</span> Мои заказы
-              </Link>
-              <Link to="/account/orders" className={styles.primaryButton}>
-                Профиль
-              </Link>
+              <NavLink to="/favorites" className={styles.ghostButton}>
+                <span aria-hidden="true">♡</span> Избранное{' '}
+                {favCount > 0 && <span className={styles.favCount}>{favCount}</span>}
+              </NavLink>
+              <NavLink to="/account/orders" className={styles.ghostButton}>
+                <span aria-hidden="true">▤</span> Мои заказы
+              </NavLink>
+              <ProfileMenu />
             </>
-          ) : (
+          )}
+          {/* Пока токен проверяется, кнопки не рисуем: иначе после перезагрузки
+              посетитель на мгновение видел бы «Войти». */}
+          {authStatus === 'guest' && (
             <Link to="/login" className={styles.loginButton}>
               Войти
             </Link>

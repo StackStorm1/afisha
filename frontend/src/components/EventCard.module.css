@@ -1,6 +1,8 @@
 .card {
   flex: none;
-  width: 248px;
+  /* В ленте карточка фиксированной ширины, в сетке избранного — по колонке. */
+  width: var(--event-card-width, 248px);
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;

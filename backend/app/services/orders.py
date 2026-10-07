@@ -1,13 +1,11 @@
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_EVEN, Decimal
-from math import ceil
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.core.errors import ErrorCode
@@ -31,7 +29,6 @@ from app.schemas.orders import (
     PriceCategory,
 )
 from app.schemas.orders import OrderStatus as SchemaOrderStatus
-from app.schemas.primitives import Pagination
 
 _CENT = Decimal("0.01")
 
@@ -202,161 +199,3 @@ async def create_order(
         created_at=order.created_at,
         updated_at=order.updated_at,
     )
-
-
-def _load_options():
-    return (
-        selectinload(Order.bookings).selectinload(Booking.seat),
-        selectinload(Order.session)
-        .selectinload(Session.venue)
-        .selectinload(VenueModel.city),
-        selectinload(Order.session).selectinload(Session.event),
-    )
-
-
-def _build_order_detail(order: Order) -> OrderDetail:
-    sess = order.session
-    venue = sess.venue
-    city = venue.city
-    event = sess.event
-    bookings = sorted(order.bookings, key=lambda b: (b.seat.row_no, b.seat.seat_no))
-    return OrderDetail(
-        id=order.id,
-        session=OrderSessionRef(
-            id=sess.id,
-            event=OrderEventRef(
-                id=event.id, title=event.title, poster_url=event.poster_url
-            ),
-            venue=OrderVenueRef(
-                name=venue.name,
-                address=venue.address,
-                city=CitySchema.model_validate(city),
-            ),
-            starts_at=sess.starts_at,
-            price=sess.base_price,
-        ),
-        seats=[
-            BookedSeat(
-                id=b.seat.id,
-                row_no=b.seat.row_no,
-                seat_no=b.seat.seat_no,
-                price_category=PriceCategory(b.seat.price_category.lower()),
-                price=b.price,
-            )
-            for b in bookings
-        ],
-        total_price=order.total_price,
-        status=SchemaOrderStatus(order.status.lower()),
-        expires_at=bookings[0].expires_at if bookings else None,
-        created_at=order.created_at,
-        updated_at=order.updated_at,
-    )
-
-
-async def list_orders(
-    db: AsyncSession,
-    user: User,
-    *,
-    order_status: SchemaOrderStatus | None,
-    page: int,
-    per_page: int,
-) -> tuple[list[OrderDetail], Pagination]:
-    stmt = select(Order).where(Order.user_id == user.id)
-    if order_status is not None:
-        stmt = stmt.where(Order.status == OrmOrderStatus[order_status.name])
-
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total: int = (await db.execute(count_stmt)).scalar_one()
-    total_pages = ceil(total / per_page) if total > 0 else 0
-
-    stmt = (
-        stmt.options(*_load_options())
-        .order_by(Order.created_at.desc())
-        .offset((page - 1) * per_page)
-        .limit(per_page)
-    )
-    orders = (await db.execute(stmt)).scalars().all()
-
-    return [_build_order_detail(o) for o in orders], Pagination(
-        page=page, per_page=per_page, total=total, total_pages=total_pages
-    )
-
-
-async def get_order(db: AsyncSession, order_id: UUID, user: User) -> OrderDetail:
-    stmt = (
-        select(Order)
-        .where(Order.id == order_id, Order.user_id == user.id)
-        .options(*_load_options())
-    )
-    order = (await db.execute(stmt)).scalar_one_or_none()
-    if order is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": ErrorCode.NOT_FOUND, "message": "Заказ не найден"},
-        )
-    return _build_order_detail(order)
-
-
-async def cancel_order(db: AsyncSession, order_id: UUID, user: User) -> OrderDetail:
-    stmt = (
-        select(Order)
-        .where(Order.id == order_id, Order.user_id == user.id)
-        .options(*_load_options())
-    )
-    order = (await db.execute(stmt)).scalar_one_or_none()
-    if order is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": ErrorCode.NOT_FOUND, "message": "Заказ не найден"},
-        )
-
-    if order.status not in (OrmOrderStatus.PENDING, OrmOrderStatus.PAID):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": ErrorCode.ORDER_NOT_CANCELLABLE,
-                "message": "Заказ нельзя отменить",
-            },
-        )
-
-    sess = order.session
-    now = datetime.now(UTC)
-    if sess.starts_at <= now:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "code": ErrorCode.SESSION_ALREADY_STARTED,
-                "message": "Сеанс уже начался",
-            },
-        )
-
-    active_bookings = [
-        b
-        for b in order.bookings
-        if b.status in (BookingStatus.HELD, BookingStatus.PAID)
-    ]
-    n = len(active_bookings)
-
-    await db.execute(
-        update(Booking)
-        .where(Booking.order_id == order.id)
-        .values(status=BookingStatus.CANCELLED, expires_at=None)
-    )
-    await db.execute(
-        update(Session)
-        .where(Session.id == sess.id)
-        .values(seats_available=Session.seats_available + n)
-    )
-    await db.execute(
-        update(Order)
-        .where(Order.id == order.id)
-        .values(status=OrmOrderStatus.CANCELLED, paid_at=None)
-    )
-    await db.commit()
-
-    refreshed = (
-        await db.execute(
-            select(Order).where(Order.id == order.id).options(*_load_options())
-        )
-    ).scalar_one()
-    return _build_order_detail(refreshed)
