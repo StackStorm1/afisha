@@ -13,6 +13,7 @@ const HANDLE_SIZE = 9;
 // Ручку легче схватить, чем увидеть: зона нажатия шире квадратика.
 const HANDLE_HIT = 22;
 const NO_ZONE_FILL = '#5D5872';
+const ERROR_STROKE = '#FF8FA4';
 // Клик инструментом рисования без перетаскивания ставит сектор такого
 // размера, как у кнопки «+ Сектор».
 const CLICK_RECT = { width: 200, height: 180 };
@@ -58,7 +59,10 @@ function toCanvasPoint(svg, canvas, clientX, clientY) {
   return { x: (clientX - left) / scale, y: (clientY - top) / scale };
 }
 
-function SectionShape({ section, selected, zoneById }) {
+// invalid — null, если у сектора нет ошибок, иначе { geometry }: ошибка
+// положения закрашивается штриховкой, ошибка содержимого (нет рядов, нет
+// зоны) обводится пунктиром.
+function SectionShape({ section, selected, invalid, hatchId, zoneById }) {
   const { x, y, width, height } = shapeRect(section.shape);
   const standing = section.kind === 'standing';
   const zone = standing ? zoneById.get(section.price_zone_id) : null;
@@ -68,6 +72,12 @@ function SectionShape({ section, selected, zoneById }) {
     [section, standing]
   );
   const size = standing ? 0 : seatSize(seatPitch(section));
+  let fill = standing && zone ? `${zoneColor(zone.sort_order)}55` : '#14141C';
+  let stroke = selected ? '#F0EFF6' : 'rgba(255,255,255,.18)';
+  if (invalid) {
+    stroke = ERROR_STROKE;
+    if (invalid.geometry) fill = `url(#${hatchId})`;
+  }
 
   return (
     <g className={styles.section} data-section={section.id}>
@@ -76,9 +86,11 @@ function SectionShape({ section, selected, zoneById }) {
         y={y}
         width={width}
         height={height}
-        fill={standing && zone ? `${zoneColor(zone.sort_order)}55` : '#14141C'}
-        stroke={selected ? '#F0EFF6' : 'rgba(255,255,255,.18)'}
-        strokeWidth={selected ? 2 : 1}
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={selected || invalid ? 2 : 1}
+        strokeDasharray={invalid && !invalid.geometry ? '6 4' : undefined}
+        data-invalid={invalid ? (invalid.geometry ? 'geometry' : 'content') : undefined}
       />
       {seats.map((seat) => {
         const seatZone = zoneById.get(seat.price_zone_id);
@@ -116,12 +128,16 @@ function rectText(name, { x, y, width, height }) {
 // холст сообщает только положение и размер выбранного после сдвига.
 export default function LayoutCanvas({
   layout,
+  invalid,
   selectedId,
   onSelect,
   onChangeRect,
   onCreate,
+  children,
 }) {
   const hintId = useId();
+  // Двоеточия из useId в url(#…) внутри fill браузеры понимают не все.
+  const hatchId = `hatch-${useId().replace(/:/g, '')}`;
   const svgRef = useRef(null);
   const gestureRef = useRef(null);
   const [tool, setTool] = useState('select');
@@ -289,6 +305,18 @@ export default function LayoutCanvas({
           onPointerUp={() => endGesture(true)}
           onPointerCancel={() => endGesture(false)}
         >
+          <defs>
+            <pattern
+              id={hatchId}
+              width="8"
+              height="8"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <rect width="8" height="8" fill="rgba(255,143,164,.12)" />
+              <rect width="3" height="8" fill="rgba(255,143,164,.35)" />
+            </pattern>
+          </defs>
           <path
             d={`M${stageX - 130} 30 L${stageX + 130} 30 Q${stageX + 130} 58 ${stageX + 116} 62 Q${stageX} 92 ${stageX - 116} 62 Q${stageX - 130} 58 ${stageX - 130} 30 Z`}
             fill="#4A46C4"
@@ -305,6 +333,8 @@ export default function LayoutCanvas({
                   : section
               }
               selected={section.id === selectedId}
+              invalid={invalid.get(section.id) ?? null}
+              hatchId={hatchId}
               zoneById={zoneById}
             />
           ))}
@@ -341,6 +371,7 @@ export default function LayoutCanvas({
             })}
         </svg>
       </div>
+      {children}
     </div>
   );
 }

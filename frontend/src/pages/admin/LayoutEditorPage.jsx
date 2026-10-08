@@ -1,4 +1,4 @@
-import { useReducer, useState } from 'react';
+import { useEffect, useId, useMemo, useReducer, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import LayoutCanvas from '../../components/admin/LayoutCanvas.jsx';
 import SectionProperties from '../../components/admin/SectionProperties.jsx';
@@ -12,6 +12,7 @@ import {
   zoneColor,
 } from '../../lib/hallLayout.js';
 import { createDraft, draftReducer } from '../../lib/layoutDraft.js';
+import { fieldErrors, issuesBySection, layoutIssues } from '../../lib/layoutIssues.js';
 import { formatCount, pluralWord } from '../../lib/format.js';
 import { uuid } from '../../lib/uuid.js';
 import styles from './LayoutEditorPage.module.css';
@@ -55,10 +56,20 @@ function Editor({ initial }) {
     return revision ? { kind: 'ok', text: PUBLISH_MESSAGES[revision] } : null;
   });
   const { layout, selectedId, dirty } = state;
+  const issuesId = useId();
+  const propsRef = useRef(null);
+  // «Исправить» выбирает сектор и ставит фокус в поле с ошибкой. Поле
+  // появляется только после перерисовки панели свойств, поэтому фокус
+  // ставится в эффекте. Каждый запрос — новый объект, повторный клик тоже
+  // срабатывает.
+  const [focusRequest, setFocusRequest] = useState(null);
+  const issues = useMemo(() => layoutIssues(layout), [layout]);
+  const invalid = useMemo(() => issuesBySection(issues), [issues]);
   const venue = getVenueById(layout.venue_id);
   const zones = [...layout.price_zones].sort((a, b) => a.sort_order - b.sort_order);
   const zoneById = new Map(zones.map((zone) => [zone.id, zone]));
   const selected = layout.sections.find((s) => s.id === selectedId) ?? null;
+  const errors = fieldErrors(issues, selectedId);
   const total = layoutCapacity(layout);
   const standing = standingCapacity(layout);
 
@@ -84,6 +95,16 @@ function Editor({ initial }) {
     dispatch(action);
   }
 
+  function goToIssue(issue) {
+    dispatch({ type: 'select', id: issue.sectionId });
+    if (issue.field) setFocusRequest({ field: issue.field });
+  }
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    propsRef.current?.querySelector(`[data-field="${focusRequest.field}"]`)?.focus();
+  }, [focusRequest]);
+
   return (
     <div className={styles.page}>
       <header className={styles.bar}>
@@ -103,7 +124,7 @@ function Editor({ initial }) {
         <button
           type="button"
           className={styles.publish}
-          disabled={!dirty}
+          disabled={!dirty || issues.length > 0}
           onClick={onPublish}
         >
           Опубликовать
@@ -142,6 +163,12 @@ function Editor({ initial }) {
                       </span>
                       <span className={styles.itemSub}>{sectionSummary(section)}</span>
                     </span>
+                    {invalid.has(section.id) && (
+                      <span className={styles.flag}>
+                        <span aria-hidden="true">✕</span>
+                        <span className={styles.srOnly}>, есть ошибки</span>
+                      </span>
+                    )}
                   </button>
                 </li>
               );
@@ -176,11 +203,49 @@ function Editor({ initial }) {
           onSelect={(id) => dispatch({ type: 'select', id })}
           onChangeRect={(id, rect) => edit({ type: 'setRect', id, rect })}
           onCreate={(kind, rect) => edit({ type: 'addSection', id: uuid(), kind, rect })}
-        />
+          invalid={invalid}
+        >
+          {issues.length > 0 && (
+            <section className={styles.issues} aria-labelledby={issuesId}>
+              <h2 id={issuesId} className={styles.issuesTitle}>
+                Публикация заблокирована · {issues.length}{' '}
+                {pluralWord(issues.length, 'ошибка', 'ошибки', 'ошибок')}
+              </h2>
+              <ul className={styles.issueList}>
+                {issues.map((issue, index) => {
+                  const textId = `${issuesId}-${index}`;
+                  return (
+                    <li key={issue.key} className={styles.issue}>
+                      <span aria-hidden="true" className={styles.issueMark}>
+                        ✕
+                      </span>
+                      <span id={textId}>{issue.text}</span>
+                      {issue.sectionId && (
+                        <button
+                          type="button"
+                          className={styles.issueAction}
+                          aria-describedby={textId}
+                          onClick={() => goToIssue(issue)}
+                        >
+                          {issue.field ? 'Исправить' : 'Показать'}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+        </LayoutCanvas>
 
-        <div className={styles.props}>
+        <div className={styles.props} ref={propsRef}>
           {selected ? (
-            <SectionProperties section={selected} zones={zones} dispatch={edit} />
+            <SectionProperties
+              section={selected}
+              zones={zones}
+              errors={errors}
+              dispatch={edit}
+            />
           ) : (
             <p className={styles.empty}>Выберите сектор слева или на схеме.</p>
           )}

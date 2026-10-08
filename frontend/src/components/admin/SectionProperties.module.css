@@ -92,6 +92,16 @@
   border-color: var(--color-link);
 }
 
+.control[data-invalid='true'] {
+  border-color: var(--color-status-error);
+}
+
+.error {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-status-error);
+}
+
 .input,
 .select {
   flex: 1;

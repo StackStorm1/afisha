@@ -2,6 +2,7 @@ import { uuid } from '../lib/uuid.js';
 import { toMoney } from '../lib/money.js';
 import { createSeededRandom, hashSeed } from '../lib/seededRandom.js';
 import { generateSeats, rectShape } from '../lib/hallLayout.js';
+import { layoutIssues } from '../lib/layoutIssues.js';
 import { VENUES } from './venues.js';
 import { getSession, listEvents, listEventSessions } from './events.js';
 import { getBalconyStartRow } from './seatMap.js';
@@ -361,9 +362,9 @@ function validationError(details) {
   return new HallLayoutError('VALIDATION_ERROR', 'Ошибка валидации', details);
 }
 
-// Проверка формы черновика. Ошибки геометрии (пересечения, пустые сектора)
-// ловит редактор до отправки; здесь — только то, без чего конфигурацию
-// нельзя сохранить вообще.
+// Проверка черновика целиком. Ошибки схемы (пересечения, пустые сектора,
+// ряды без зоны) редактор показывает до отправки, но сервер их повторяет:
+// черновик мог прийти не из редактора.
 function checkDraft(draft) {
   const details = [];
   if (!String(draft?.name ?? '').trim()) {
@@ -376,6 +377,16 @@ function checkDraft(draft) {
     details.push({ field: 'sections', message: 'Нужен хотя бы один сектор' });
   }
   if (details.length > 0) throw validationError(details);
+  const issues = layoutIssues({
+    canvas_width: CANVAS_WIDTH,
+    canvas_height: CANVAS_HEIGHT,
+    ...draft,
+  });
+  if (issues.length > 0) {
+    throw validationError(
+      issues.map((issue) => ({ field: 'sections', message: issue.text }))
+    );
+  }
 }
 
 function stripDraft(draft) {

@@ -103,6 +103,10 @@ describe('редактор схемы', () => {
     renderEditor('Клубная');
     await user.click(screen.getByRole('button', { name: '+ Сектор' }));
     expect(sectorButton('Сектор 2')).toHaveAttribute('aria-pressed', 'true');
+    // Новый сектор встаёт в центр, на танцпол: уводим его вниз.
+    expect(screen.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
+    screen.getByRole('application').focus();
+    await user.keyboard('{ArrowDown>15/}');
     await user.click(screen.getByRole('button', { name: 'Опубликовать' }));
     expect(screen.getByRole('status')).toHaveTextContent('Изменения опубликованы');
     expect(getLayout(layoutId('Клубная')).data.sections).toHaveLength(2);
@@ -196,13 +200,13 @@ describe('холст редактора', () => {
     renderEditor('Танцпол + трибуны');
     const svg = canvasSvg();
     const label = within(svg).getByText('Сектор B');
-    drag(label, svg, [400, 450], [323, 404]);
+    drag(label, svg, [400, 450], [323, 424]);
     expect(sectorButton('Сектор B')).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Опубликовать' }));
     const b = getLayout(layoutId('Танцпол + трибуны')).data.sections.find(
       (s) => s.name === 'Сектор B'
     );
-    expect(shapeRect(b.shape)).toMatchObject({ x: 120, y: 330 });
+    expect(shapeRect(b.shape)).toMatchObject({ x: 120, y: 350 });
   });
 
   it('угловая ручка меняет размер, места перестраиваются', () => {
@@ -236,5 +240,104 @@ describe('холст редактора', () => {
       'aria-pressed',
       'true'
     );
+  });
+});
+
+describe('проверка схемы в редакторе', () => {
+  function issuesPanel() {
+    return screen.getByRole('region', { name: /Публикация заблокирована/ });
+  }
+
+  it('6c: пересечение и сектор без рядов блокируют публикацию до исправления', async () => {
+    const user = userEvent.setup();
+    renderEditor('Танцпол + трибуны');
+    const canvas = screen.getByRole('application');
+    const publish = screen.getByRole('button', { name: 'Опубликовать' });
+    expect(screen.queryByRole('region', { name: /Публикация заблокирована/ })).toBeNull();
+
+    // «Сектор C» налезает на танцпол.
+    await user.click(sectorButton('Сектор C'));
+    canvas.focus();
+    await user.keyboard('{ArrowLeft>8/}');
+
+    // «Ложа 1» слева внизу, без рядов.
+    await user.click(screen.getByRole('button', { name: '+ Сектор' }));
+    canvas.focus();
+    await user.keyboard('{ArrowLeft>26/}{ArrowDown>17/}');
+    await user.keyboard('{Shift>}{ArrowLeft>9/}{ArrowUp>10/}{/Shift}');
+    expect(screen.getByText('Сектор 5: x 60, y 400, 110 × 80')).toBeInTheDocument();
+    const name = screen.getByLabelText('Название');
+    await user.clear(name);
+    await user.type(name, 'Ложа 1');
+    await user.clear(screen.getByLabelText('Рядов'));
+
+    expect(issuesPanel()).toHaveAccessibleName('Публикация заблокирована · 2 ошибки');
+    const items = within(issuesPanel()).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      '✕«Сектор C» пересекается с зоной «Танцпол»Показать',
+      '✕У «Ложа 1» нулевая вместимость: нет ни одного рядаИсправить',
+    ]);
+    expect(publish).toBeDisabled();
+    for (const flagged of ['Сектор C', 'Танцпол', 'Ложа 1']) {
+      expect(sectorButton(flagged)).toHaveAccessibleName(/есть ошибки$/);
+    }
+    expect(sectorButton('Сектор A')).not.toHaveAccessibleName(/есть ошибки/);
+    const marks = [...canvas.querySelectorAll('[data-invalid]')];
+    expect(marks.map((r) => r.getAttribute('data-invalid'))).toEqual([
+      'geometry',
+      'geometry',
+      'content',
+    ]);
+
+    // «Исправить» выбирает ложу и ставит фокус в поле с ошибкой.
+    await user.click(within(items[1]).getByRole('button', { name: 'Исправить' }));
+    expect(sectorButton('Ложа 1')).toHaveAttribute('aria-pressed', 'true');
+    const rows = screen.getByLabelText('Рядов');
+    expect(rows).toHaveFocus();
+    expect(rows).toHaveAttribute('aria-invalid', 'true');
+    expect(rows).toHaveAccessibleDescription('Нужен хотя бы один ряд');
+    await user.type(rows, '4');
+    expect(issuesPanel()).toHaveAccessibleName('Публикация заблокирована · 1 ошибка');
+    expect(rows).toHaveAttribute('aria-invalid', 'false');
+
+    // «Показать» выбирает «Сектор C», его уводят обратно.
+    await user.click(within(issuesPanel()).getByRole('button', { name: 'Показать' }));
+    expect(sectorButton('Сектор C')).toHaveAttribute('aria-pressed', 'true');
+    canvas.focus();
+    await user.keyboard('{ArrowRight>8/}');
+
+    expect(screen.queryByRole('region', { name: /Публикация заблокирована/ })).toBeNull();
+    expect(publish).toBeEnabled();
+    await user.click(publish);
+    expect(await screen.findByRole('status')).toHaveTextContent('новой версией');
+  });
+
+  it('у стоячей зоны без вместимости ошибка под полем', async () => {
+    const user = userEvent.setup();
+    renderEditor('Клубная');
+    const capacity = screen.getByLabelText('Вместимость');
+    await user.clear(capacity);
+    expect(capacity).toHaveAttribute('aria-invalid', 'true');
+    expect(capacity).toHaveAccessibleDescription('Вместимость должна быть больше нуля');
+    expect(
+      within(issuesPanel()).getByText('У «Танцпол» нулевая вместимость')
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Опубликовать' })).toBeDisabled();
+  });
+
+  it('ряды без ценовой зоны: ошибка у диапазонов, «Исправить» ведёт к ним', async () => {
+    const user = userEvent.setup();
+    renderEditor('Танцпол + трибуны');
+    await user.click(sectorButton('Сектор B'));
+    await user.click(screen.getByRole('button', { name: 'Удалить диапазон 2' }));
+    expect(
+      within(issuesPanel()).getByText('В «Сектор B» ряды 3–12 без ценовой зоны')
+    ).toBeVisible();
+    await user.click(sectorButton('Танцпол'));
+    await user.click(within(issuesPanel()).getByRole('button', { name: 'Исправить' }));
+    expect(
+      screen.getByRole('group', { name: 'Зоны по рядам' })
+    ).toHaveAccessibleDescription('Ряды 3–12 без ценовой зоны');
+    expect(screen.getByRole('button', { name: '+ Диапазон рядов' })).toHaveFocus();
   });
 });

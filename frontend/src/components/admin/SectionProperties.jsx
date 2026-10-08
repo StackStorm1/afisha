@@ -14,14 +14,26 @@ const NUMBERING = [
   { value: 'letters', label: 'А, Б, В…' },
 ];
 
-function NumberField({ label, value, unit, max, onChange }) {
+// Текст ошибки под полем. Поле ссылается на него через aria-describedby,
+// чтобы экранный диктор прочитал ошибку вместе с подписью.
+function FieldError({ id, text }) {
+  if (!text) return null;
+  return (
+    <span id={id} className={styles.error}>
+      {text}
+    </span>
+  );
+}
+
+function NumberField({ label, field, value, unit, max, error, onChange }) {
   const id = useId();
+  const errorId = useId();
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.label}>
         {label}
       </label>
-      <div className={styles.control}>
+      <div className={styles.control} data-invalid={Boolean(error)}>
         <input
           id={id}
           type="number"
@@ -29,11 +41,15 @@ function NumberField({ label, value, unit, max, onChange }) {
           min={0}
           max={max}
           value={value}
+          data-field={field}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
           onChange={(e) => onChange(e.target.value)}
           className={styles.input}
         />
         {unit && <span className={styles.unit}>{unit}</span>}
       </div>
+      <FieldError id={errorId} text={error} />
     </div>
   );
 }
@@ -56,10 +72,13 @@ function ZoneSelect({ label, value, zones, onChange, className }) {
   );
 }
 
-export default function SectionProperties({ section, zones, dispatch }) {
+// errors — ошибки полей этого сектора: имя поля → текст под ним.
+export default function SectionProperties({ section, zones, errors, dispatch }) {
   const nameId = useId();
   const numberingId = useId();
   const zoneId = useId();
+  const zoneErrorId = useId();
+  const rangesErrorId = useId();
   const id = section.id;
   const standing = section.kind === 'standing';
   const capacity = sectionCapacity(section);
@@ -107,24 +126,32 @@ export default function SectionProperties({ section, zones, dispatch }) {
         <>
           <NumberField
             label="Вместимость"
+            field="capacity"
             value={section.capacity}
             unit="чел."
             max={LIMITS.capacity}
+            error={errors.get('capacity')}
             onChange={(value) => dispatch({ type: 'setCapacity', id, capacity: value })}
           />
           <div className={styles.field}>
             <label htmlFor={zoneId} className={styles.label}>
               Ценовая зона
             </label>
-            <div className={styles.control}>
+            <div className={styles.control} data-invalid={errors.has('price_zone_id')}>
               <select
                 id={zoneId}
                 value={section.price_zone_id ?? ''}
+                data-field="price_zone_id"
+                aria-invalid={errors.has('price_zone_id')}
+                aria-describedby={errors.has('price_zone_id') ? zoneErrorId : undefined}
                 onChange={(e) =>
                   dispatch({ type: 'setZone', id, zoneId: e.target.value })
                 }
                 className={styles.select}
               >
+                {!zones.some((zone) => zone.id === section.price_zone_id) && (
+                  <option value="">Без зоны</option>
+                )}
                 {zones.map((zone) => (
                   <option key={zone.id} value={zone.id}>
                     {zone.name}
@@ -132,14 +159,17 @@ export default function SectionProperties({ section, zones, dispatch }) {
                 ))}
               </select>
             </div>
+            <FieldError id={zoneErrorId} text={errors.get('price_zone_id')} />
           </div>
         </>
       ) : (
         <>
           <NumberField
             label="Рядов"
+            field="rows_count"
             value={section.generator.rows_count}
             max={LIMITS.rows}
+            error={errors.get('rows_count')}
             onChange={(value) =>
               dispatch({ type: 'setGenerator', id, patch: { rows_count: value } })
             }
@@ -147,16 +177,20 @@ export default function SectionProperties({ section, zones, dispatch }) {
           <div className={styles.pair}>
             <NumberField
               label="Мест в первом ряду"
+              field="seats_first"
               value={section.generator.seats_first}
               max={LIMITS.seatsPerRow}
+              error={errors.get('seats_first')}
               onChange={(value) =>
                 dispatch({ type: 'setGenerator', id, patch: { seats_first: value } })
               }
             />
             <NumberField
               label="В последнем"
+              field="seats_last"
               value={section.generator.seats_last}
               max={LIMITS.seatsPerRow}
+              error={errors.get('seats_last')}
               onChange={(value) =>
                 dispatch({ type: 'setGenerator', id, patch: { seats_last: value } })
               }
@@ -188,7 +222,10 @@ export default function SectionProperties({ section, zones, dispatch }) {
             </div>
           </div>
 
-          <fieldset className={styles.ranges}>
+          <fieldset
+            className={styles.ranges}
+            aria-describedby={errors.has('zone_ranges') ? rangesErrorId : undefined}
+          >
             <legend className={styles.label}>Зоны по рядам</legend>
             {section.generator.zone_ranges.map((range, index) => {
               const zone = zoneById.get(range.price_zone_id);
@@ -262,9 +299,11 @@ export default function SectionProperties({ section, zones, dispatch }) {
                 </div>
               );
             })}
+            <FieldError id={rangesErrorId} text={errors.get('zone_ranges')} />
             <button
               type="button"
               className={styles.link}
+              data-field="zone_ranges"
               onClick={() => dispatch({ type: 'addRange', id })}
             >
               + Диапазон рядов
