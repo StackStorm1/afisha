@@ -11,6 +11,7 @@ import AdminLayout from './pages/admin/AdminLayout.jsx';
 import AdminEventsPage from './pages/admin/AdminEventsPage.jsx';
 import AdminVenuesPage from './pages/admin/AdminVenuesPage.jsx';
 import LayoutEditorPage from './pages/admin/LayoutEditorPage.jsx';
+import SessionHallPage from './pages/admin/SessionHallPage.jsx';
 
 // key={eventId}: без него React Router переиспользует тот же экземпляр
 // EventPage при переходе между двумя событиями (например, по клику на
@@ -57,6 +58,7 @@ export default function App() {
         >
           <Route index element={<Navigate to="events" replace />} />
           <Route path="events" element={<AdminEventsPage />} />
+          <Route path="events/sessions/:sessionId/hall" element={<SessionHallPage />} />
           <Route path="venues" element={<AdminVenuesPage />} />
         </Route>
         <Route

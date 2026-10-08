@@ -120,6 +120,14 @@ export function generateSeats(section) {
   return seats;
 }
 
+// Ценовая зона, которой сектор подписывается в списках и мини-схемах:
+// у стоячей она одна, у сидячего — зона первого диапазона рядов.
+export function sectionZoneId(section) {
+  return section.kind === 'standing'
+    ? section.price_zone_id
+    : (section.generator.zone_ranges[0]?.price_zone_id ?? null);
+}
+
 export function sectionCapacity(section) {
   if (section.kind === 'standing') return Math.max(0, section.capacity ?? 0);
   return rowSeatCounts(section.generator).reduce((sum, n) => sum + n, 0);

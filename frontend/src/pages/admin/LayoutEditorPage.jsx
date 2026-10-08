@@ -8,6 +8,7 @@ import {
   layoutCapacity,
   rowSeatCounts,
   sectionCapacity,
+  sectionZoneId,
   standingCapacity,
   zoneColor,
 } from '../../lib/hallLayout.js';
@@ -31,12 +32,6 @@ function sectionSummary(section) {
   if (rows === 0) return 'нет рядов';
   const seats = sectionCapacity(section);
   return `${rows} ${pluralWord(rows, 'ряд', 'ряда', 'рядов')} · ${formatCount(seats)} ${pluralWord(seats, 'место', 'места', 'мест')}`;
-}
-
-function sectionZoneId(section) {
-  return section.kind === 'standing'
-    ? section.price_zone_id
-    : section.generator.zone_ranges[0]?.price_zone_id;
 }
 
 const PUBLISH_MESSAGES = {
