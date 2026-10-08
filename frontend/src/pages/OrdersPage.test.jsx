@@ -48,7 +48,7 @@ function visitorWithOrder({ paid }) {
       if (session.status !== 'active' || new Date(session.starts_at) <= new Date())
         continue;
       const seat = getSeatMap(session.id)
-        .rows.flatMap((row) => row.seats)
+        .sections.flatMap((section) => section.seats ?? [])
         .find((s) => s.status === 'free');
       if (!seat) continue;
       const order = createOrder({

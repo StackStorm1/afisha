@@ -1,4 +1,4 @@
-import { getSessionZones, ZONE_LABELS } from './cardBadge.js';
+import { getSessionZones, listZoneNames } from './cardBadge.js';
 import { formatPrice, formatTime, pluralizeSeats } from './format.js';
 
 const LEFT_WARNING_THRESHOLD = 20;
@@ -30,17 +30,13 @@ export function buildSessionRowView(session, { authorized }) {
   // дешёвая и не самая дорогая: цена про остаток мест ничего не говорит.
   let zonesLabel;
   if (sold) {
-    zonesLabel = `${zones.map((z) => ZONE_LABELS[z.category]).join(' · ')} — мест нет`;
+    zonesLabel = `${zones.map((z) => z.name).join(' · ')} — мест нет`;
   } else if (availableZones.length < zones.length) {
-    const soldOutLabels = zones
-      .filter((z) => z.available === 0)
-      .map((z) => ZONE_LABELS[z.category]);
-    const availLabels = availableZones.map((z) => ZONE_LABELS[z.category].toLowerCase());
-    zonesLabel = `${soldOutLabels.join(', ')} распродан · ${availLabels.join(', ')} в продаже`;
+    const soldOut = zones.filter((z) => z.available === 0);
+    const avail = listZoneNames(availableZones).toLowerCase();
+    zonesLabel = `${listZoneNames(soldOut)} ${soldOut.length > 1 ? 'распроданы' : 'распродан'} · ${avail} в продаже`;
   } else {
-    zonesLabel = zones
-      .map((z) => `${ZONE_LABELS[z.category]} ${formatPrice(z.price)}`)
-      .join(' · ');
+    zonesLabel = zones.map((z) => `${z.name} ${formatPrice(z.price)}`).join(' · ');
   }
 
   let leftLabel = `Свободно ${pluralizeSeats(left)}`;

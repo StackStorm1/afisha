@@ -13,8 +13,23 @@ function order(id, startsAt, status = 'paid') {
   return { id, status, session: { starts_at: startsAt } };
 }
 
-function seat(row_no, seat_no, price_category = 'stalls') {
-  return { row_no, seat_no, price_category };
+const HALL = { id: 'hall', name: 'Зал', kind: 'seated' };
+const SECTOR_B = { id: 'b', name: 'Сектор B', kind: 'seated' };
+const DANCE = { id: 'dance', name: 'Танцпол', kind: 'standing' };
+const STALLS = { id: 'stalls', name: 'Партер' };
+const BALCONY = { id: 'balcony', name: 'Балкон' };
+
+function seat(row, number, zone = STALLS, section = HALL) {
+  return {
+    section,
+    row_label: String(row),
+    seat_label: String(number),
+    price_zone: zone,
+  };
+}
+
+function standingUnit() {
+  return { section: DANCE, row_label: null, seat_label: null, price_zone: DANCE };
 }
 
 describe('splitOrders', () => {
@@ -70,18 +85,33 @@ describe('groupUpcoming', () => {
 });
 
 describe('подписи строки заказа', () => {
-  it('места сливаются в диапазоны по рядам', () => {
-    expect(formatSeats([seat(4, 6), seat(4, 5)])).toBe('Ряд 4, места 5–6');
-    expect(formatSeats([seat(2, 3)])).toBe('Ряд 2, место 3');
+  it('места сливаются в диапазоны по рядам, сектор впереди', () => {
+    expect(formatSeats([seat(4, 6), seat(4, 5)])).toBe('Зал · Ряд 4, места 5–6');
+    expect(formatSeats([seat(2, 3)])).toBe('Зал · Ряд 2, место 3');
     expect(
       formatSeats([seat(5, 1), seat(3, 7), seat(3, 9), seat(3, 8), seat(3, 12)])
-    ).toBe('Ряд 3, места 7–9, 12; Ряд 5, место 1');
+    ).toBe('Зал · Ряд 5, место 1; Ряд 3, места 7–9, 12');
   });
 
-  it('ценовая категория мест', () => {
+  it('стоячая зона — количеством, разные сектора через точку', () => {
+    expect(formatSeats([standingUnit(), standingUnit()])).toBe('Танцпол × 2');
+    expect(
+      formatSeats([
+        seat(4, 11, STALLS, SECTOR_B),
+        seat(4, 12, STALLS, SECTOR_B),
+        standingUnit(),
+      ])
+    ).toBe('Сектор B · Ряд 4, места 11–12 · Танцпол × 1');
+  });
+
+  it('буквенные ряды и места не ломают сборку диапазонов', () => {
+    expect(formatSeats([seat('А', 1), seat('А', 2)])).toBe('Зал · Ряд А, места 1–2');
+  });
+
+  it('ценовые зоны мест', () => {
     expect(formatZones([seat(1, 1)])).toBe('Партер');
-    expect(formatZones([seat(15, 1, 'balcony')])).toBe('Балкон');
-    expect(formatZones([seat(1, 1), seat(15, 1, 'balcony')])).toBe('Партер и балкон');
+    expect(formatZones([seat(15, 1, BALCONY)])).toBe('Балкон');
+    expect(formatZones([seat(1, 1), seat(15, 1, BALCONY)])).toBe('Партер и балкон');
   });
 
   it('номер заказа — первые 8 символов uuid заглавными', () => {

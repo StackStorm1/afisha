@@ -1,25 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import { listEvents, listEventSessions } from '../data/events.js';
-import { getSeatMap } from '../data/seatMap.js';
+import { getSeatMap, setUnitsStatus } from '../data/seatMap.js';
 import { deriveCardBadge } from './cardBadge.js';
 import { buildSessionRowView } from './sessionRowView.js';
 
+// Сидячий зал с партером и балконом, где есть свободные места.
 function findActiveSession() {
-  const event = listEvents({ per_page: 200 }).data[0];
-  return listEventSessions(event.id).find((s) => s.status === 'active');
+  return listEvents({ per_page: 200 })
+    .data.flatMap((event) => listEventSessions(event.id))
+    .find(
+      (s) =>
+        s.status === 'active' && s.venue.name !== 'Adrenaline Stadium' && s.seats_left > 0
+    );
 }
 
-// Балкон дешевле партера (price_factor), поэтому наивное «распродана та
-// категория, у которой минимальная цена» всегда указывало бы на балкон —
-// баг, который эти тесты фиксируют явно, продавая именно партер.
+// Балкон дешевле партера, поэтому наивное «распродана та категория, у
+// которой минимальная цена» всегда указывало бы на балкон — баг, который
+// эти тесты фиксируют явно, продавая именно партер.
 function sellOutStalls(session) {
   const seatMap = getSeatMap(session.id);
-  for (const row of seatMap.rows) {
-    for (const seat of row.seats) {
-      if (seat.price_category === 'stalls') seat.status = 'paid';
-      if (seat.price_category === 'balcony') seat.status = 'free';
-    }
-  }
+  const stalls = seatMap.price_zones.find((z) => z.name === 'Партер').id;
+  const seats = seatMap.sections.flatMap((section) => section.seats);
+  const ids = (inStalls) =>
+    seats.filter((seat) => (seat.price_zone_id === stalls) === inStalls).map((s) => s.id);
+  setUnitsStatus(session.id, ids(true), 'paid');
+  setUnitsStatus(session.id, ids(false), 'free');
 }
 
 describe('deriveCardBadge — распроданная категория определяется по остатку, не по цене', () => {

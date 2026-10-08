@@ -3,6 +3,7 @@ import { toMoney } from '../lib/money.js';
 import { createSeededRandom, pick, randomInt } from '../lib/seededRandom.js';
 import { CATEGORIES } from './categories.js';
 import { VENUES } from './venues.js';
+import { defaultLayoutCapacity } from './hallLayoutSeeds.js';
 import { TITLES_BY_CATEGORY, DESCRIPTIONS } from './eventTitles.js';
 
 const AGE_RATINGS = ['0+', '6+', '12+', '16+', '18+'];
@@ -14,7 +15,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const random = createSeededRandom(20260918);
 
 function buildSession({ eventId, venue, startsAt, status, seatsAvailable }) {
-  const seatsTotal = venue.rows_count * venue.seats_per_row;
+  // Мест у сеанса столько, сколько единиц в конфигурации зала по
+  // умолчанию: кресла и места на танцполе.
+  const seatsTotal = defaultLayoutCapacity(venue.id);
   return {
     id: uuid(random),
     event_id: eventId,
@@ -31,7 +34,9 @@ function buildSession({ eventId, venue, startsAt, status, seatsAvailable }) {
 function buildSessionsForEvent(eventId) {
   const sessionsCount = randomInt(random, 2, 6);
   const venue = pick(random, VENUES);
-  const seatsTotal = venue.rows_count * venue.seats_per_row;
+  // Мест у сеанса столько, сколько единиц в конфигурации зала по
+  // умолчанию: кресла и места на танцполе.
+  const seatsTotal = defaultLayoutCapacity(venue.id);
 
   // ~15% событий полностью распроданы: иначе бейдж «Продано» и связанные
   // с ним состояния карточки в моках просто не встречаются.

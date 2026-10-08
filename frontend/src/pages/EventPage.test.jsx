@@ -116,11 +116,11 @@ describe('EventPage — числительные согласованы с су�
     expect(checked).toBeGreaterThan(0);
   });
 
-  it('состав зала подписан склонёнными рядами и местами', () => {
+  it('зал подписан названием схемы и склонённой вместимостью', () => {
     renderEvent(catalog[0].id);
 
-    expect(screen.getByText(/^Зал: /).textContent).toMatch(
-      /^Зал: \d+ (ряд|ряда|рядов) по \d+ (место|места|мест)\./
+    expect(screen.getByText(/^Зал «/).textContent).toMatch(
+      /^Зал «[^»]+»: [\d ]+ (место|места|мест)(, из них [\d ]+ стоячих)?\.$/
     );
   });
 });

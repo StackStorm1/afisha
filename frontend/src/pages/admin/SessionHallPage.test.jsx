@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import App from '../../App.jsx';
+import { formatCount } from '../../lib/format.js';
 import { useAuth } from '../../store/useAuth.js';
 import { DEMO_ADMIN } from '../../data/auth.js';
 import { listEvents, listEventSessions } from '../../data/events.js';
@@ -183,7 +184,7 @@ describe('схема зала для сеанса', () => {
     expect(card('Сидячий партер')).toBeDisabled();
     expect(card('Клубная')).toBeDisabled();
     expect(card('Клубная')).toHaveTextContent(
-      new RegExp(`Недоступно: продан.* ${sold} `)
+      new RegExp(`Недоступно: продан.* ${formatCount(sold)} `)
     );
     expect(card('Танцпол \\+ трибуны')).toBeEnabled();
     expect(screen.getByLabelText('VIP')).toHaveAttribute('readonly');

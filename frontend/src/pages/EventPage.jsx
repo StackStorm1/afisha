@@ -4,24 +4,34 @@ import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
 import PosterImage from '../components/PosterImage.jsx';
 import { getEvent } from '../data/events.js';
-import { getBalconyStartRow } from '../data/seatMap.js';
+import { getSeatMap } from '../data/seatMap.js';
 import { useEventDateStrip } from '../lib/useEventSessions.js';
 import { buildSessionRowView } from '../lib/sessionRowView.js';
-import { getSessionZones, ZONE_LABELS } from '../lib/cardBadge.js';
+import { getSessionZones, listZoneNames } from '../lib/cardBadge.js';
 import { useFavoriteToggle } from '../lib/useFavoriteToggle.js';
 import { useAuth } from '../store/useAuth.js';
 import { loginState } from '../lib/loginRedirect.js';
 import {
+  formatCount,
   formatDuration,
   formatPrice,
   formatSessionWhen,
-  pluralizeRows,
-  pluralizeSeats,
+  pluralWord,
   pluralizeSessions,
 } from '../lib/format.js';
 import styles from './EventPage.module.css';
 
 const DESCRIPTION_CLAMP_THRESHOLD = 180;
+
+// «Зал «Танцпол + трибуны»: 2 648 мест, из них 1 800 стоячих.»
+function describeHall(seatMap, total) {
+  const standing = seatMap.sections
+    .filter((section) => section.kind === 'standing')
+    .reduce((sum, section) => sum + section.capacity, 0);
+  const seats = `${formatCount(total)} ${pluralWord(total, 'место', 'места', 'мест')}`;
+  const tail = standing > 0 ? `, из них ${formatCount(standing)} стоячих` : '';
+  return `Зал «${seatMap.layout.name}»: ${seats}${tail}.`;
+}
 
 function nextOpenSession(activeSessions) {
   return (
@@ -83,12 +93,12 @@ export default function EventPage() {
     openPrices.length > 0 ? `от ${formatPrice(Math.min(...openPrices))}` : 'Продано';
 
   const venue = next?.venue ?? allSessions[0]?.venue ?? null;
-  const balconyStartRow = venue ? getBalconyStartRow(venue.rows_count) : null;
-  const priceCategories = venue
-    ? [...new Set(allSessions.flatMap((s) => getSessionZones(s).map((z) => z.category)))]
-        .map((code) => ZONE_LABELS[code])
-        .join(', ')
-    : '—';
+  // Схема зала ближайшего сеанса: у сеансов одной площадки она может быть
+  // разной (танцпол или сидячий партер), описываем ту, что продаётся первой.
+  const hallSession = next ?? allSessions[0] ?? null;
+  const seatMap = hallSession ? getSeatMap(hallSession.id) : null;
+  const priceCategories = seatMap ? listZoneNames(seatMap.price_zones) : '—';
+  const hallLabel = seatMap ? describeHall(seatMap, hallSession.total_seats) : null;
 
   const dates = activeSessions.map((s) => s.starts_at.slice(0, 10)).sort();
   const sessionCountLabel =
@@ -343,12 +353,7 @@ export default function EventPage() {
                 {venue.address} · {venue.city.name}
               </span>
               <div className={styles.asideDivider} />
-              <span className={styles.venueCardAddress}>
-                Зал: {pluralizeRows(venue.rows_count)} по{' '}
-                {pluralizeSeats(venue.seats_per_row)}. Ряды 1–
-                {balconyStartRow - 1} — партер, {balconyStartRow}–{venue.rows_count} —
-                балкон.
-              </span>
+              <span className={styles.venueCardAddress}>{hallLabel}</span>
               <Link to={`/?venue=${venue.id}`} className={styles.venueCardLink}>
                 Все события на этой площадке →
               </Link>

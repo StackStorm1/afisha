@@ -1,15 +1,15 @@
 import { uuid } from '../lib/uuid.js';
 import { toMoney } from '../lib/money.js';
 import { getEventBySessionId, getSession } from './events.js';
-import { findSeat, getSeatMap } from './seatMap.js';
+import { findSection, findUnit, freeStandingUnits, setUnitsStatus } from './seatMap.js';
 import { DEMO_USER } from './auth.js';
 import { buildDemoOrders } from './demoOrders.js';
 
 const HOLD_MINUTES = 15; // BR-02
 
-// openapi.yaml, CreateOrderRequest.seat_ids: minItems 1, maxItems 10.
-// MAX экспортируется: на него опирается и UI (сколько мест даём выбрать на
-// схеме зала), и тесты границы — дублировать число в трёх местах нельзя.
+// Билетов в заказе — от 1 до 10: места и единицы стоячих зон вместе
+// (CreateOrderRequest в спеке схемы зала, §5.2). MAX экспортируется: на него
+// опирается и UI (сколько билетов даём выбрать), и тесты границы.
 const MIN_SEATS_PER_ORDER = 1;
 export const MAX_SEATS_PER_ORDER = 10;
 
@@ -38,14 +38,20 @@ function toSessionRef(session, event) {
   };
 }
 
-function toBookedSeat(seat) {
+// BookedSeat (§5.3): у места ряд и номер, у единицы стоячей зоны — null.
+function toBookedSeat({ unit, section, seat, zone, price }) {
   return {
-    id: seat.id,
-    row_no: seat.row_no,
-    seat_no: seat.seat_no,
-    price_category: seat.price_category,
-    price: seat.price,
+    id: unit.id,
+    section: { id: section.id, name: section.name, kind: section.kind },
+    row_label: seat ? seat.row_label : null,
+    seat_label: seat ? seat.seat_label : null,
+    price_zone: { id: zone.id, name: zone.name },
+    price,
   };
+}
+
+function seatTitle({ section, seat }) {
+  return `${section.name}, ряд ${seat.row_label}, место ${seat.seat_label}`;
 }
 
 class OrderError extends Error {
@@ -60,63 +66,71 @@ class OrderError extends Error {
 // или истёкшая бронь держит места занятыми до конца жизни вкладки (BR-02
 // требует именно освобождения, не просто смены статуса заказа).
 function releaseSeats(order) {
-  const seatMap = getSeatMap(order.session.id);
-  if (!seatMap) return;
-  for (const bookedSeat of order.seats) {
-    for (const row of seatMap.rows) {
-      const seat = row.seats.find((s) => s.id === bookedSeat.id);
-      if (seat) seat.status = 'free';
+  setUnitsStatus(
+    order.session.id,
+    order.seats.map((seat) => seat.id),
+    'free'
+  );
+}
+
+// Проверяет тело CreateOrderRequest. Форма ошибки — VALIDATION_ERROR с
+// details[].field, чтобы обработчик отличал её и от NOT_FOUND, и от
+// конфликтов SEAT_ALREADY_TAKEN / NOT_ENOUGH_CAPACITY.
+//
+// Повтор одного места пропускать нельзя: проверка занятости прошла бы для
+// обоих повторов, и место попало бы в заказ дважды. Отдаём VALIDATION_ERROR,
+// а не SEAT_ALREADY_TAKEN: место свободно, ошибка в запросе, а код конфликта
+// увёл бы UI в сценарий US-13 «место уже заняли, выберите другое». Так же
+// с повтором стоячей зоны: количество задаётся одной строкой.
+function validateRequest(seatIds, standing) {
+  const invalid = (field, message) =>
+    new OrderError('VALIDATION_ERROR', 'Ошибка валидации', [{ field, message }]);
+
+  if (!Array.isArray(seatIds)) throw invalid('seat_ids', 'Ожидается список id мест');
+  if (!Array.isArray(standing)) {
+    throw invalid('standing', 'Ожидается список стоячих зон');
+  }
+  for (const item of standing) {
+    if (!Number.isInteger(item?.quantity) || item.quantity < 1) {
+      throw invalid('standing', 'Количество билетов в зону — целое число от 1');
     }
   }
-}
 
-// Проверяет seat_ids по CreateOrderRequest. Форма ошибки — VALIDATION_ERROR
-// с details[].field из openapi.yaml (описание схемы Error: поле-адрес для
-// этого кода — `field`), чтобы обработчик отличал её и от NOT_FOUND, и от
-// конфликта SEAT_ALREADY_TAKEN.
-//
-// Дубликаты контракт не описывает (uniqueItems у seat_ids нет), но пропускать
-// их нельзя: findSeat на повторный id возвращает тот же свободный объект,
-// проверка занятости проходит, и место попадает в заказ дважды — total_price
-// выходит кратно больше цены реально удержанных мест. Отдаём VALIDATION_ERROR,
-// а не SEAT_ALREADY_TAKEN: место свободно, ошибка в запросе, а код конфликта
-// увёл бы UI в сценарий US-13 «место уже заняли, выберите другое».
-function validateSeatIds(seatIds) {
-  const invalid = (message) =>
-    new OrderError('VALIDATION_ERROR', 'Ошибка валидации', [
-      { field: 'seat_ids', message },
-    ]);
-
-  if (!Array.isArray(seatIds)) throw invalid('Ожидается список id мест');
-
-  if (seatIds.length < MIN_SEATS_PER_ORDER) {
-    throw invalid('Выберите хотя бы одно место');
+  const total = seatIds.length + standing.reduce((sum, item) => sum + item.quantity, 0);
+  if (total < MIN_SEATS_PER_ORDER) {
+    throw invalid('seat_ids', 'Выберите хотя бы одно место');
   }
-  if (seatIds.length > MAX_SEATS_PER_ORDER) {
-    throw invalid(`За один раз можно выбрать не больше ${MAX_SEATS_PER_ORDER} мест`);
+  if (total > MAX_SEATS_PER_ORDER) {
+    throw invalid(
+      'seat_ids',
+      `За один раз можно выбрать не больше ${MAX_SEATS_PER_ORDER} билетов`
+    );
   }
   if (new Set(seatIds).size !== seatIds.length) {
-    throw invalid('Одно и то же место передано несколько раз');
+    throw invalid('seat_ids', 'Одно и то же место передано несколько раз');
+  }
+  const sections = standing.map((item) => item.section_id);
+  if (new Set(sections).size !== sections.length) {
+    throw invalid('standing', 'Одна и та же зона передана несколько раз');
   }
 }
 
-// Мок POST /orders (US-11, BR-01, BR-02, BR-04): держит места 15 минут,
-// статус заказа сразу pending. Бросает OrderError с кодом SEAT_ALREADY_TAKEN,
-// если среди seatIds есть уже занятое — форма ошибки повторяет Error/details
-// из openapi.yaml, чтобы обработчик конфликта мог отличить его от прочих.
-export function createOrder({ sessionId, seatIds, userId }) {
-  // Тело запроса проверяется до поиска сеанса: на бэкенде границы minItems/
-  // maxItems снимет схема запроса, то есть ещё до обработчика ручки.
-  validateSeatIds(seatIds);
+// Мок POST /orders (US-11, BR-01, BR-02, BR-04): держит места и единицы
+// стоячих зон 15 минут, статус заказа сразу pending. Конфликты: занятое
+// место — SEAT_ALREADY_TAKEN с details[].seat_id; в стоячей зоне меньше
+// свободных единиц, чем просили, — NOT_ENOUGH_CAPACITY с остатком в
+// details. Сидячий сектор в standing — SECTION_NOT_STANDING.
+export function createOrder({ sessionId, seatIds = [], standing = [], userId }) {
+  // Тело запроса проверяется до поиска сеанса: на бэкенде границы снимет
+  // схема запроса, то есть ещё до обработчика ручки.
+  validateRequest(seatIds, standing);
 
   const session = getSession(sessionId);
   if (!session) throw new OrderError('NOT_FOUND', 'Сеанс не найден');
 
   // BR-04 — два независимых условия, и статуса мало: прошедший сеанс остаётся
   // 'active', пока его кто-нибудь не переведёт в 'completed', а в моке этого
-  // не делает никто. Без проверки времени бронь на вчерашний показ
-  // оформлялась без единой ошибки. Тот же вопрос в cancelOrder задан ниже —
-  // здесь его не было.
+  // не делает никто.
   if (session.status !== 'active') {
     throw new OrderError('SESSION_NOT_ACTIVE', 'Сеанс отменён');
   }
@@ -124,29 +138,63 @@ export function createOrder({ sessionId, seatIds, userId }) {
     throw new OrderError('SESSION_NOT_ACTIVE', 'Сеанс уже начался');
   }
 
-  const seats = seatIds.map((seatId) => findSeat(sessionId, seatId));
-  const takenSeats = seats.filter((seat) => !seat || seat.status !== 'free');
+  const seats = seatIds.map((seatId) => findUnit(sessionId, seatId));
+  if (seats.some((found) => !found || !found.seat)) {
+    throw new OrderError('VALIDATION_ERROR', 'Ошибка валидации', [
+      { field: 'seat_ids', message: 'Такого места в зале этого сеанса нет' },
+    ]);
+  }
+  const takenSeats = seats.filter((found) => found.unit.status !== 'free');
   if (takenSeats.length > 0) {
     throw new OrderError(
       'SEAT_ALREADY_TAKEN',
       'Одно или несколько выбранных мест уже заняты',
-      takenSeats.filter(Boolean).map((seat) => ({
-        seat_id: seat.id,
-        message: `Ряд ${seat.row_no}, место ${seat.seat_no} уже занято`,
+      takenSeats.map((found) => ({
+        seat_id: found.unit.id,
+        message: `${seatTitle(found)} уже занято`,
       }))
     );
   }
 
-  const seatMap = getSeatMap(sessionId);
-  for (const seatId of seatIds) {
-    for (const row of seatMap.rows) {
-      const seat = row.seats.find((s) => s.id === seatId);
-      if (seat) seat.status = 'held';
+  const standingIds = [];
+  const shortages = [];
+  for (const item of standing) {
+    const section = findSection(sessionId, item.section_id);
+    if (!section) {
+      throw new OrderError('VALIDATION_ERROR', 'Ошибка валидации', [
+        { field: 'standing', message: 'Такой зоны в зале этого сеанса нет' },
+      ]);
     }
+    if (section.kind !== 'standing') {
+      throw new OrderError(
+        'SECTION_NOT_STANDING',
+        `«${section.name}» — сектор с местами, выберите места на схеме`
+      );
+    }
+    const free = freeStandingUnits(sessionId, section.id);
+    if (free.length < item.quantity) {
+      shortages.push({
+        section_id: section.id,
+        available: free.length,
+        message: `В зоне «${section.name}» осталось ${free.length}`,
+      });
+      continue;
+    }
+    standingIds.push(...free.slice(0, item.quantity));
+  }
+  if (shortages.length > 0) {
+    throw new OrderError(
+      'NOT_ENOUGH_CAPACITY',
+      'В стоячей зоне не хватает свободных мест',
+      shortages
+    );
   }
 
+  const unitIds = [...seatIds, ...standingIds];
+  setUnitsStatus(sessionId, unitIds, 'held', userId);
+
   const event = getEventBySessionId(sessionId);
-  const bookedSeats = seats.map(toBookedSeat);
+  const bookedSeats = unitIds.map((id) => toBookedSeat(findUnit(sessionId, id)));
   const now = new Date();
   const order = {
     id: uuid(),
@@ -205,13 +253,11 @@ export function payOrder(orderId, { outcome = 'success' } = {}) {
   order.expires_at = null;
   order.updated_at = isoNow();
 
-  const seatMap = getSeatMap(order.session.id);
-  for (const bookedSeat of order.seats) {
-    for (const row of seatMap.rows) {
-      const seat = row.seats.find((s) => s.id === bookedSeat.id);
-      if (seat) seat.status = 'paid';
-    }
-  }
+  setUnitsStatus(
+    order.session.id,
+    order.seats.map((seat) => seat.id),
+    'paid'
+  );
 
   return order;
 }

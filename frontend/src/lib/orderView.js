@@ -1,6 +1,12 @@
 import { getEvent } from '../data/events.js';
 import { addDaysIso, toDateOnly } from './dateStrip.js';
-import { formatMonthShort, formatPrice, formatSessionWhen, pluralize } from './format.js';
+import {
+  formatMonthShort,
+  formatPrice,
+  formatSessionWhen,
+  listNames,
+  pluralize,
+} from './format.js';
 
 const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
@@ -10,8 +16,6 @@ export const ORDER_STATUS = {
   failed: { glyph: '✕', label: 'Ошибка оплаты' },
   cancelled: { glyph: '—', label: 'Отменён' },
 };
-
-const ZONE_NAMES = { stalls: 'Партер', balcony: 'Балкон' };
 
 // Вкладку определяет только время сеанса, статус не влияет: отменённый
 // заказ на завтрашний сеанс остаётся в «Предстоящих». Предстоящие — от
@@ -64,37 +68,57 @@ export function groupUpcoming(upcoming, now = new Date()) {
   return groups.filter((group) => group.orders.length > 0);
 }
 
-// «Ряд 4, места 5–6», «Ряд 2, место 3». Места одного ряда сливаются в
-// диапазоны, ряды разделены точкой с запятой.
-export function formatSeats(seats) {
-  const byRow = new Map();
-  for (const seat of seats) {
-    if (!byRow.has(seat.row_no)) byRow.set(seat.row_no, []);
-    byRow.get(seat.row_no).push(seat.seat_no);
+// Номера подряд сливаются в диапазоны: «5–6», «3», «1–2, 7».
+function joinRanges(labels) {
+  const numbers = labels.map(Number);
+  if (numbers.some((n) => !Number.isInteger(n))) return labels.join(', ');
+  numbers.sort((a, b) => a - b);
+  const ranges = [];
+  for (const n of numbers) {
+    const last = ranges[ranges.length - 1];
+    if (last && n === last[1] + 1) last[1] = n;
+    else ranges.push([n, n]);
   }
-  return [...byRow.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([rowNo, numbers]) => {
-      numbers.sort((a, b) => a - b);
-      const ranges = [];
-      for (const n of numbers) {
-        const last = ranges[ranges.length - 1];
-        if (last && n === last[1] + 1) last[1] = n;
-        else ranges.push([n, n]);
-      }
-      const text = ranges.map(([from, to]) =>
-        from === to ? `${from}` : `${from}–${to}`
-      );
-      const word = numbers.length === 1 ? 'место' : 'места';
-      return `Ряд ${rowNo}, ${word} ${text.join(', ')}`;
-    })
-    .join('; ');
+  return ranges
+    .map(([from, to]) => (from === to ? `${from}` : `${from}–${to}`))
+    .join(', ');
 }
 
+// Места заказа по секторам: «Сектор B · Ряд 4, места 11–12», у стоячей
+// зоны — «Танцпол × 2». Ряды одного сектора — через точку с запятой,
+// сектора — через « · ». Порядок — как в заказе.
+export function formatSeats(seats) {
+  const sections = new Map();
+  for (const seat of seats) {
+    const entry = sections.get(seat.section.id) ?? {
+      section: seat.section,
+      rows: new Map(),
+      count: 0,
+    };
+    entry.count += 1;
+    if (seat.row_label != null) {
+      if (!entry.rows.has(seat.row_label)) entry.rows.set(seat.row_label, []);
+      entry.rows.get(seat.row_label).push(seat.seat_label);
+    }
+    sections.set(seat.section.id, entry);
+  }
+  return [...sections.values()]
+    .map(({ section, rows, count }) => {
+      if (section.kind === 'standing') return `${section.name} × ${count}`;
+      const text = [...rows.entries()]
+        .map(([row, labels]) => {
+          const word = labels.length === 1 ? 'место' : 'места';
+          return `Ряд ${row}, ${word} ${joinRanges(labels)}`;
+        })
+        .join('; ');
+      return `${section.name} · ${text}`;
+    })
+    .join(' · ');
+}
+
+// Ценовые зоны заказа по порядку появления: «Партер», «Партер и балкон».
 export function formatZones(seats) {
-  const zones = new Set(seats.map((seat) => seat.price_category));
-  if (zones.size > 1) return 'Партер и балкон';
-  return ZONE_NAMES[[...zones][0]] ?? '';
+  return listNames([...new Set(seats.map((seat) => seat.price_zone.name))]);
 }
 
 // В контракте id заказа — uuid, короткого номера нет. Для человека

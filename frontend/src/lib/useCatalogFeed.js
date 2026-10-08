@@ -82,8 +82,7 @@ export function useCatalogFeed() {
         key: 'small',
         title: 'Маленькие залы',
         why: 'Вместимость до 300 мест — камерный формат',
-        match: (card) =>
-          card.venue.rows_count * card.venue.seats_per_row <= SMALL_VENUE_CAPACITY,
+        match: (card) => card.capacity <= SMALL_VENUE_CAPACITY,
       },
       {
         key: 'later',

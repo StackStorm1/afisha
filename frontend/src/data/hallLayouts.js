@@ -1,11 +1,12 @@
 import { uuid } from '../lib/uuid.js';
 import { toMoney } from '../lib/money.js';
 import { createSeededRandom, hashSeed } from '../lib/seededRandom.js';
-import { generateSeats, rectShape } from '../lib/hallLayout.js';
+import { generateSeats } from '../lib/hallLayout.js';
 import { layoutIssues } from '../lib/layoutIssues.js';
-import { VENUES } from './venues.js';
 import { getSession, listEvents, listEventSessions } from './events.js';
-import { getBalconyStartRow } from './seatMap.js';
+import { CANVAS_HEIGHT, CANVAS_WIDTH, seedLayouts } from './hallLayoutSeeds.js';
+
+export { CANVAS_HEIGHT, CANVAS_WIDTH };
 
 // Мок админских ручек сегментной схемы зала. У площадки несколько
 // конфигураций зала (театральная, концертная с танцполом…), сеанс продаётся
@@ -15,12 +16,10 @@ import { getBalconyStartRow } from './seatMap.js';
 // строит lib/hallLayout.js. Наружу конфигурация отдаётся вместе с местами.
 // Стоячая зона — только вместимость.
 
-export const CANVAS_WIDTH = 840;
-export const CANVAS_HEIGHT = 640;
-
-// Стартовые цены зон для сеансов из каталога: базовая цена сеанса ×
-// множитель по sort_order. Дальше админ правит цены сам.
-const SEED_PRICE_FACTORS = [1, 0.6, 0.45, 0.3];
+// Стартовые цены зон для сеансов из каталога. Цена сеанса в каталоге —
+// «от»: столько стоит самая дешёвая зона (последняя по sort_order), зоны
+// ближе к сцене дороже. Дальше админ правит цены сам.
+const SEED_PRICE_FACTORS = [1, 1.6, 2.2, 3];
 
 export class HallLayoutError extends Error {
   constructor(code, message, details) {
@@ -30,14 +29,14 @@ export class HallLayoutError extends Error {
   }
 }
 
-const random = createSeededRandom(20261005);
+// id новых ревизий. Сид другой, чем у сидов: с тем же сидом первая
+// ревизия получила бы id первой сидовой конфигурации.
+const random = createSeededRandom(20261008);
 const newId = () => uuid(random);
 
 function isoNow() {
   return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
-
-const SEED_CREATED_AT = '2026-09-01T09:00:00Z';
 
 const layoutsById = new Map();
 // Порядок конфигураций площадки; архивные сюда не входят. Первая —
@@ -47,210 +46,11 @@ const layoutIdsByVenue = new Map();
 // конфигурации по умолчанию со стартовыми ценами.
 const sessionHalls = new Map();
 
-function zone(name, sortOrder) {
-  return { id: newId(), name, sort_order: sortOrder };
-}
-
-function seatedSection({
-  name,
-  rect,
-  rows,
-  seatsFirst,
-  seatsLast,
-  zoneRanges,
-  sortOrder,
-}) {
-  return {
-    id: newId(),
-    name,
-    kind: 'seated',
-    shape: rectShape(rect),
-    sort_order: sortOrder,
-    generator: {
-      rows_count: rows,
-      seats_first: seatsFirst,
-      seats_last: seatsLast ?? seatsFirst,
-      numbering: 'numeric',
-      zone_ranges: zoneRanges,
-    },
-  };
-}
-
-function standingSection({ name, rect, capacity, zoneId, sortOrder }) {
-  return {
-    id: newId(),
-    name,
-    kind: 'standing',
-    shape: rectShape(rect),
-    sort_order: sortOrder,
-    price_zone_id: zoneId,
-    capacity,
-  };
-}
-
-function range(from, to, zoneId) {
-  return { from_row: from, to_row: to, price_zone_id: zoneId };
-}
-
-function baseLayout(venueId, name, description) {
-  return {
-    id: newId(),
-    venue_id: venueId,
-    name,
-    description,
-    canvas_width: CANVAS_WIDTH,
-    canvas_height: CANVAS_HEIGHT,
-    is_archived: false,
-    created_at: SEED_CREATED_AT,
-  };
-}
-
-// Три конфигурации большой площадки — как на экране выбора конфигурации
-// в админке: танцпол с трибунами, сидячий партер, клубная.
-function stadiumLayouts(venueId) {
-  const danceVip = zone('VIP', 1);
-  const danceStand = zone('Трибуна', 2);
-  const danceFloor = zone('Танцпол', 3);
-  const danceBalcony = zone('Балкон', 4);
-  const dance = {
-    ...baseLayout(venueId, 'Танцпол + трибуны', 'Партер стоячий, сектора A–C сидячие.'),
-    price_zones: [danceVip, danceStand, danceFloor, danceBalcony],
-    sections: [
-      standingSection({
-        name: 'Танцпол',
-        rect: { x: 300, y: 120, width: 240, height: 170 },
-        capacity: 1800,
-        zoneId: danceFloor.id,
-        sortOrder: 1,
-      }),
-      seatedSection({
-        name: 'Сектор A',
-        rect: { x: 60, y: 120, width: 200, height: 220 },
-        rows: 8,
-        seatsFirst: 26,
-        seatsLast: 35,
-        zoneRanges: [range(1, 8, danceBalcony.id)],
-        sortOrder: 2,
-      }),
-      seatedSection({
-        name: 'Сектор B',
-        rect: { x: 200, y: 380, width: 440, height: 180 },
-        rows: 12,
-        seatsFirst: 24,
-        seatsLast: 36,
-        zoneRanges: [range(1, 2, danceVip.id), range(3, 12, danceStand.id)],
-        sortOrder: 3,
-      }),
-      seatedSection({
-        name: 'Сектор C',
-        rect: { x: 580, y: 120, width: 200, height: 220 },
-        rows: 8,
-        seatsFirst: 26,
-        seatsLast: 35,
-        zoneRanges: [range(1, 8, danceBalcony.id)],
-        sortOrder: 4,
-      }),
-    ],
-  };
-
-  const seatedStalls = zone('Партер', 1);
-  const seatedStand = zone('Трибуна', 2);
-  const seatedBalcony = zone('Балкон', 3);
-  const seated = {
-    ...baseLayout(venueId, 'Сидячий партер', 'Вместо танцпола 24 ряда кресел.'),
-    price_zones: [seatedStalls, seatedStand, seatedBalcony],
-    sections: [
-      seatedSection({
-        name: 'Партер',
-        rect: { x: 280, y: 110, width: 280, height: 260 },
-        rows: 24,
-        seatsFirst: 48,
-        seatsLast: 56,
-        zoneRanges: [range(1, 24, seatedStalls.id)],
-        sortOrder: 1,
-      }),
-      seatedSection({
-        name: 'Сектор A',
-        rect: { x: 40, y: 120, width: 200, height: 220 },
-        rows: 8,
-        seatsFirst: 26,
-        seatsLast: 35,
-        zoneRanges: [range(1, 8, seatedBalcony.id)],
-        sortOrder: 2,
-      }),
-      seatedSection({
-        name: 'Сектор B',
-        rect: { x: 200, y: 400, width: 440, height: 180 },
-        rows: 12,
-        seatsFirst: 24,
-        seatsLast: 36,
-        zoneRanges: [range(1, 12, seatedStand.id)],
-        sortOrder: 3,
-      }),
-      seatedSection({
-        name: 'Сектор C',
-        rect: { x: 600, y: 120, width: 200, height: 220 },
-        rows: 8,
-        seatsFirst: 26,
-        seatsLast: 35,
-        zoneRanges: [range(1, 8, seatedBalcony.id)],
-        sortOrder: 4,
-      }),
-    ],
-  };
-
-  const clubFloor = zone('Танцпол', 1);
-  const club = {
-    ...baseLayout(venueId, 'Клубная', 'Только танцпол, трибуны закрыты.'),
-    price_zones: [clubFloor],
-    sections: [
-      standingSection({
-        name: 'Танцпол',
-        rect: { x: 200, y: 120, width: 440, height: 260 },
-        capacity: 1800,
-        zoneId: clubFloor.id,
-        sortOrder: 1,
-      }),
-    ],
-  };
-
-  return [dance, seated, club];
-}
-
-// Остальные площадки: один сидячий зал той же сеткой, что и сейчас у
-// посетителя (rows_count × seats_per_row, балкон — последние ряды).
-function hallLayout(venue) {
-  const stalls = zone('Партер', 1);
-  const balcony = zone('Балкон', 2);
-  const balconyStart = getBalconyStartRow(venue.rows_count);
-  return {
-    ...baseLayout(venue.id, 'Основная', 'Весь зал сидячий: партер и балкон.'),
-    price_zones: [stalls, balcony],
-    sections: [
-      seatedSection({
-        name: 'Зал',
-        rect: { x: 60, y: 110, width: 720, height: 480 },
-        rows: venue.rows_count,
-        seatsFirst: venue.seats_per_row,
-        zoneRanges: [
-          range(1, balconyStart - 1, stalls.id),
-          range(balconyStart, venue.rows_count, balcony.id),
-        ],
-        sortOrder: 1,
-      }),
-    ],
-  };
-}
-
 function seed() {
-  for (const venue of VENUES) {
-    const layouts =
-      venue.name === 'Adrenaline Stadium'
-        ? stadiumLayouts(venue.id)
-        : [hallLayout(venue)];
+  for (const [venueId, layouts] of seedLayouts()) {
     for (const layout of layouts) layoutsById.set(layout.id, layout);
     layoutIdsByVenue.set(
-      venue.id,
+      venueId,
       layouts.map((layout) => layout.id)
     );
   }
@@ -296,8 +96,10 @@ function defaultLayoutId(venueId) {
 function seedPrices(layout, session) {
   return [...layout.price_zones]
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((z, i) => {
-      const factor = SEED_PRICE_FACTORS[Math.min(i, SEED_PRICE_FACTORS.length - 1)];
+    .map((z, i, zones) => {
+      const fromCheapest = zones.length - 1 - i;
+      const factor =
+        SEED_PRICE_FACTORS[Math.min(fromCheapest, SEED_PRICE_FACTORS.length - 1)];
       // Округление до 100 ₽ — так выглядят цены живых афиш.
       return {
         price_zone_id: z.id,

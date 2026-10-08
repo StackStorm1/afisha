@@ -75,6 +75,14 @@ export function pluralWord(count, one, few, many) {
   return many;
 }
 
+// «Партер», «Партер и балкон», «VIP, трибуна и балкон» — первое слово с
+// заглавной, остальные строчными.
+export function listNames(names) {
+  const words = names.map((name, i) => (i === 0 ? name : name.toLowerCase()));
+  if (words.length <= 1) return words.join('');
+  return `${words.slice(0, -1).join(', ')} и ${words[words.length - 1]}`;
+}
+
 export function pluralizeEvents(count) {
   return pluralize(count, 'событие', 'события', 'событий');
 }

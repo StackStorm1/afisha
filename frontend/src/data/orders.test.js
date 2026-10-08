@@ -14,16 +14,19 @@ import {
 import { expectOrderDetail, expectPagination } from './schemaAssertions.js';
 import { DEMO_USER } from './auth.js';
 
+function seatsOf(seatMap) {
+  return seatMap.sections.flatMap((section) => section.seats ?? []);
+}
+
 function freeSession(minFreeSeats = 2) {
   const events = listEvents({ per_page: 200 }).data;
   for (const event of events) {
     for (const session of listEventSessions(event.id)) {
       if (session.status !== 'active') continue;
       if (new Date(session.starts_at) <= new Date()) continue;
-      const seatMap = getSeatMap(session.id);
-      const freeSeats = seatMap.rows
-        .flatMap((row) => row.seats)
-        .filter((s) => s.status === 'free');
+      const freeSeats = seatsOf(getSeatMap(session.id)).filter(
+        (s) => s.status === 'free'
+      );
       if (freeSeats.length >= minFreeSeats) return { session, freeSeats };
     }
   }
@@ -97,7 +100,7 @@ describe('orders mock — POST /orders (создание брони)', () => {
     expect(order.seats).toHaveLength(MAX_SEATS_PER_ORDER);
   });
 
-  // Один id, переданный дважды, проходил проверку занятости (findSeat отдаёт
+  // Один id, переданный дважды, проходил проверку занятости (поиск места отдаёт
   // тот же свободный объект) и попадал в заказ дважды — сумма выходила кратно
   // больше цены реально удержанного места.
   it('дубликат места — VALIDATION_ERROR, а не задвоенная сумма', () => {
@@ -113,15 +116,13 @@ describe('orders mock — POST /orders (создание брони)', () => {
     }
 
     // Место осталось свободным: неудачная валидация ничего не удержала.
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('free');
   });
 
   it('отменённый сеанс — SESSION_NOT_ACTIVE (BR-04)', () => {
     const session = cancelledSession();
-    const seatId = getSeatMap(session.id).rows[0].seats[0].id;
+    const seatId = seatsOf(getSeatMap(session.id))[0].id;
 
     expect.assertions(1);
     try {
@@ -150,9 +151,7 @@ describe('orders mock — POST /orders (создание брони)', () => {
     }
 
     expect(listMyOrders({ per_page: 500 }).pagination.total).toBe(before);
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('free');
   });
 
@@ -221,9 +220,7 @@ describe('orders mock — POST /orders/{id}/pay (US-14, US-16, BR-05)', () => {
     }
 
     expect(getOrder(order.id).status).toBe('cancelled');
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('free');
   });
 });
@@ -246,9 +243,7 @@ describe('orders mock — отмена и список заказов (US-15, US
     const order = createOrder({ sessionId: session.id, seatIds: [seatId] });
     cancelOrder(order.id);
 
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('free');
 
     const rebooked = createOrder({ sessionId: session.id, seatIds: [seatId] });
@@ -366,9 +361,7 @@ describe('orders mock — фоновое истечение броней (BR-02,
 
     expect(expired.map((o) => o.id)).toContain(order.id);
     expect(getOrder(order.id).status).toBe('cancelled');
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('free');
   });
 
@@ -380,9 +373,7 @@ describe('orders mock — фоновое истечение броней (BR-02,
     const expired = expireStaleOrders(); // now < expires_at
     expect(expired.map((o) => o.id)).not.toContain(order.id);
     expect(getOrder(order.id).status).toBe('pending');
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('held');
   });
 
@@ -414,9 +405,7 @@ describe('orders mock — фоновое истечение броней (BR-02,
     vi.useRealTimers();
 
     expect(getOrder(order.id).status).toBe('cancelled');
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('free');
   });
 
@@ -443,9 +432,142 @@ describe('orders mock — фоновое истечение броней (BR-02,
 
     expect(getOrder(order.id).status).toBe('cancelled');
     expect(onExpire).toHaveBeenCalled();
-    const seat = getSeatMap(session.id)
-      .rows.flatMap((row) => row.seats)
-      .find((s) => s.id === seatId);
+    const seat = seatsOf(getSeatMap(session.id)).find((s) => s.id === seatId);
     expect(seat.status).toBe('free');
+  });
+});
+
+describe('orders mock — стоячие зоны (спека схемы зала §4, §5.2)', () => {
+  function stadiumSession() {
+    for (const event of listEvents({ per_page: 500 }).data) {
+      for (const session of listEventSessions(event.id)) {
+        if (session.venue.name !== 'Adrenaline Stadium') continue;
+        if (session.status !== 'active') continue;
+        const seatMap = getSeatMap(session.id);
+        const dance = seatMap.sections.find((s) => s.kind === 'standing');
+        if (dance.available >= 3) return { session, seatMap, dance };
+      }
+    }
+    throw new Error('в моках нет сеанса стадиона со свободным танцполом');
+  }
+
+  it('места и танцпол в одном заказе: единицы без ряда, сумма по ценам зон', () => {
+    const { session, seatMap, dance } = stadiumSession();
+    const seat = seatsOf(seatMap).find((s) => s.status === 'free');
+    const order = createOrder({
+      sessionId: session.id,
+      seatIds: [seat.id],
+      standing: [{ section_id: dance.id, quantity: 2 }],
+      userId: 'u-standing',
+    });
+
+    expectOrderDetail(order);
+    expect(order.seats).toHaveLength(3);
+    const standing = order.seats.filter((s) => s.section.kind === 'standing');
+    expect(standing).toHaveLength(2);
+    expect(standing[0]).toMatchObject({
+      section: { id: dance.id, name: 'Танцпол', kind: 'standing' },
+      row_label: null,
+      seat_label: null,
+    });
+    const zonePrice = (id) => Number(seatMap.price_zones.find((z) => z.id === id).price);
+    expect(Number(order.total_price)).toBe(
+      zonePrice(seat.price_zone_id) + 2 * zonePrice(dance.price_zone_id)
+    );
+
+    const after = getSeatMap(session.id, { userId: 'u-standing' });
+    const danceAfter = after.sections.find((s) => s.id === dance.id);
+    expect(danceAfter.available).toBe(dance.available - 2);
+    expect(danceAfter.held_by_me).toBe(2);
+    expect(
+      getSeatMap(session.id).sections.find((s) => s.id === dance.id).held_by_me
+    ).toBe(0);
+    expect(seatsOf(after).find((s) => s.id === seat.id)).toMatchObject({
+      status: 'held',
+      held_by_me: true,
+    });
+
+    cancelOrder(order.id);
+    expect(getSeatMap(session.id).sections.find((s) => s.id === dance.id).available).toBe(
+      dance.available
+    );
+  });
+
+  it('просят больше, чем осталось, — NOT_ENOUGH_CAPACITY с остатком, ничего не удержано', () => {
+    const { session, dance } = stadiumSession();
+    const left = () =>
+      getSeatMap(session.id).sections.find((s) => s.id === dance.id).available;
+    // Разбираем танцпол заказами по 10, пока не останется одна единица.
+    while (left() > 1) {
+      const quantity = Math.min(left() - 1, MAX_SEATS_PER_ORDER);
+      createOrder({
+        sessionId: session.id,
+        standing: [{ section_id: dance.id, quantity }],
+      });
+    }
+
+    expect.assertions(3);
+    try {
+      createOrder({
+        sessionId: session.id,
+        standing: [{ section_id: dance.id, quantity: 2 }],
+      });
+    } catch (error) {
+      expect(error.code).toBe('NOT_ENOUGH_CAPACITY');
+      expect(error.details).toEqual([
+        expect.objectContaining({ section_id: dance.id, available: 1 }),
+      ]);
+    }
+    expect(left()).toBe(1);
+  });
+
+  it('сидячий сектор в standing — SECTION_NOT_STANDING', () => {
+    const { session, seatMap } = stadiumSession();
+    const seated = seatMap.sections.find((s) => s.kind === 'seated');
+    expect.assertions(1);
+    try {
+      createOrder({
+        sessionId: session.id,
+        standing: [{ section_id: seated.id, quantity: 1 }],
+      });
+    } catch (error) {
+      expect(error.code).toBe('SECTION_NOT_STANDING');
+    }
+  });
+
+  it('лимит 10 билетов — на места и танцпол вместе', () => {
+    const { session, seatMap, dance } = stadiumSession();
+    const seats = seatsOf(seatMap)
+      .filter((s) => s.status === 'free')
+      .slice(0, 3)
+      .map((s) => s.id);
+    expect.assertions(2);
+    try {
+      createOrder({
+        sessionId: session.id,
+        seatIds: seats,
+        standing: [{ section_id: dance.id, quantity: 8 }],
+      });
+    } catch (error) {
+      expect(error.code).toBe('VALIDATION_ERROR');
+    }
+    const order = createOrder({
+      sessionId: session.id,
+      seatIds: seats,
+      standing: [{ section_id: dance.id, quantity: 7 }],
+    });
+    expect(order.seats).toHaveLength(MAX_SEATS_PER_ORDER);
+  });
+
+  it('количество не целое или ноль — VALIDATION_ERROR', () => {
+    const { session, dance } = stadiumSession();
+    for (const quantity of [0, 1.5, '2']) {
+      expect(() =>
+        createOrder({
+          sessionId: session.id,
+          standing: [{ section_id: dance.id, quantity }],
+        })
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION_ERROR' }));
+    }
   });
 });
