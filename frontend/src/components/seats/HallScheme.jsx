@@ -1,6 +1,12 @@
 import { memo, useId } from 'react';
 import { formatCount, formatPrice } from '../../lib/format.js';
-import { rowStarts, seatPitch, seatState, sectionBounds } from '../../lib/seatScheme.js';
+import {
+  rowStarts,
+  seatPitch,
+  seatState,
+  seatsClickable,
+  sectionBounds,
+} from '../../lib/seatScheme.js';
 import styles from './HallScheme.module.css';
 
 // Место — квадрат на 78% шага сетки, со скруглением.
@@ -24,8 +30,22 @@ function Stage({ width }) {
   );
 }
 
-function Seat({ seat, pitch, color, sectionName, price, dimmed }) {
-  const state = seatState(seat);
+// Мемо: при выборе одного места перерисовывается только оно, а не все
+// места зала.
+const Seat = memo(function Seat({
+  seat,
+  pitch,
+  color,
+  sectionName,
+  price,
+  dimmed,
+  selected,
+  clickable,
+  lost,
+}) {
+  // Место, которое заняли, пока человек выбирал, — занятое с розовой
+  // обводкой, даже если схема ещё не перечитана.
+  const state = lost ? 'taken' : seatState(seat, selected);
   const size = pitch * SEAT_SHARE;
   const x = seat.x - size / 2;
   const y = seat.y - size / 2;
@@ -34,7 +54,15 @@ function Seat({ seat, pitch, color, sectionName, price, dimmed }) {
     state === 'taken' ? 'занято' : formatPrice(price)
   }`;
   return (
-    <g className={styles.seat} data-state={state} data-dimmed={dimmed}>
+    <g
+      className={styles.seat}
+      data-state={state}
+      data-dimmed={dimmed}
+      data-lost={lost || undefined}
+      data-seat-id={
+        clickable && state !== 'taken' && !seat.held_by_me ? seat.id : undefined
+      }
+    >
       <title>{title}</title>
       <rect
         x={x}
@@ -60,11 +88,12 @@ function Seat({ seat, pitch, color, sectionName, price, dimmed }) {
       )}
     </g>
   );
-}
+});
 
-function SeatedSeats({ section, colors, prices, highlight }) {
+function SeatedSeats({ section, colors, prices, highlight, selectedIds, lostSeatIds }) {
   const pitch = seatPitch(section.seats);
   if (pitch === 0) return null;
+  const clickable = seatsClickable(section);
   return (
     <g className={styles.seats}>
       {section.seats.map((seat) => (
@@ -76,6 +105,9 @@ function SeatedSeats({ section, colors, prices, highlight }) {
           sectionName={section.name}
           price={prices.get(seat.price_zone_id)}
           dimmed={highlight !== null && seat.price_zone_id !== highlight}
+          selected={selectedIds.has(seat.id)}
+          lost={lostSeatIds.has(seat.id)}
+          clickable={clickable}
         />
       ))}
       {pitch >= ROW_LABEL_MIN_PITCH &&
@@ -96,7 +128,18 @@ function SeatedSeats({ section, colors, prices, highlight }) {
   );
 }
 
-function Section({ section, summary, colors, prices, hatchId, highlight }) {
+function Section({
+  section,
+  summary,
+  colors,
+  prices,
+  hatchId,
+  highlight,
+  selectedIds,
+  lostSeatIds,
+  standingQty,
+  open,
+}) {
   const dimmed = highlight !== null && !summary.zoneIds.includes(highlight);
   const { x, y, width, height } = sectionBounds(section);
   const standing = section.kind === 'standing';
@@ -108,7 +151,10 @@ function Section({ section, summary, colors, prices, hatchId, highlight }) {
       : undefined;
   let sub = summary.soldOut ? 'продано' : `осталось ${formatCount(summary.available)}`;
   if (standing && !summary.soldOut) sub += ` · ${formatPrice(summary.minPrice)}`;
-  const picked = standing ? section.held_by_me : 0;
+  const picked = standing ? section.held_by_me + (standingQty[section.id] ?? 0) : 0;
+  // Клик по блоку: стоячая зона открывает панель количества, сидячий сектор
+  // с мелкими местами — крупный вид сектора.
+  const opensSomething = !summary.soldOut && (standing || !seatsClickable(section));
 
   return (
     <g
@@ -116,6 +162,9 @@ function Section({ section, summary, colors, prices, hatchId, highlight }) {
       data-kind={section.kind}
       data-sold={summary.soldOut}
       data-dimmed={dimmed}
+      data-open={open}
+      data-section-id={section.id}
+      data-opens={opensSomething}
     >
       {/* Заливка стилем, а не атрибутом: атрибут перебило бы правило .block. */}
       <polygon
@@ -151,6 +200,8 @@ function Section({ section, summary, colors, prices, hatchId, highlight }) {
           colors={colors}
           prices={prices}
           highlight={highlight}
+          selectedIds={selectedIds}
+          lostSeatIds={lostSeatIds}
         />
       )}
     </g>
@@ -172,11 +223,25 @@ function contentBox(sections, canvasWidth) {
   return { x: left, y: 0, width: right - left, height: bottom };
 }
 
+const NO_SELECTION = new Set();
+
 // Схема зала этапа 1: сцена, сектора блоками по своей геометрии, места
-// сеткой внутри сидячих. Только картинка: выбор мест с клавиатуры и
-// экранным диктором — через «Выбор без схемы», поэтому сама схема для
-// вспомогательных технологий — одно изображение с подписью.
-function HallScheme({ seatMap, colors, summaries, highlight = null }) {
+// сеткой внутри сидячих. Мышью и пальцем: выбор с клавиатуры и экранным
+// диктором — через «Выбор без схемы», поэтому сама схема для
+// вспомогательных технологий — одно изображение с подписью. Клики ловит
+// один обработчик на всю схему: мест на стадионе почти тысяча.
+function HallScheme({
+  seatMap,
+  colors,
+  summaries,
+  highlight = null,
+  selectedIds = NO_SELECTION,
+  lostSeatIds = NO_SELECTION,
+  standingQty = {},
+  openSectionId = null,
+  onSeatClick,
+  onSectionClick,
+}) {
   const hatchId = `hatch${useId().replace(/:/g, '')}`;
   const { canvas_width: width } = seatMap.layout;
   const view = contentBox(seatMap.sections, width);
@@ -191,6 +256,15 @@ function HallScheme({ seatMap, colors, summaries, highlight = null }) {
       viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
       role="img"
       aria-label={label}
+      onClick={(e) => {
+        const seatId = e.target.closest('[data-seat-id]')?.dataset.seatId;
+        if (seatId) {
+          onSeatClick?.(seatId);
+          return;
+        }
+        const node = e.target.closest('[data-section-id]');
+        if (node) onSectionClick?.(node.dataset.sectionId, node.dataset.opens === 'true');
+      }}
     >
       <defs>
         <pattern
@@ -216,6 +290,10 @@ function HallScheme({ seatMap, colors, summaries, highlight = null }) {
             prices={prices}
             hatchId={hatchId}
             highlight={highlight}
+            selectedIds={selectedIds}
+            lostSeatIds={lostSeatIds}
+            standingQty={standingQty}
+            open={openSectionId === section.id}
           />
         );
       })}

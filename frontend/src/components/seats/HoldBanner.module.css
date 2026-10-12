@@ -1,0 +1,39 @@
+.banner {
+  margin-top: 16px;
+  padding: 12px 18px;
+  border: 1px solid var(--color-border-control);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.label {
+  color: var(--color-ink-secondary);
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Последняя минута — тёплым, не красным: это ещё не ошибка. */
+.banner[data-urgent='true'] .time {
+  color: var(--color-status-warning);
+}
+
+.link {
+  margin-left: auto;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

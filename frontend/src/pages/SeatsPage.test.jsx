@@ -116,14 +116,15 @@ describe('схема зала посетителя', () => {
   it('клик по зоне в легенде подсвечивает её, повторный снимает', async () => {
     const user = userEvent.setup();
     renderAt(seatsUrl(stadiumSession()));
-    const dance = await screen.findByRole('button', { name: /^Танцпол/ });
+    const legend = await screen.findByRole('group', { name: 'Ценовые зоны' });
+    const dance = within(legend).getByRole('button', { name: /^Танцпол/ });
 
     await user.click(dance);
     expect(dance).toHaveAttribute('aria-pressed', 'true');
     expect(sectionNode('Танцпол')).toHaveAttribute('data-dimmed', 'false');
     expect(sectionNode('Сектор A')).toHaveAttribute('data-dimmed', 'true');
 
-    const vip = screen.getByRole('button', { name: /^VIP/ });
+    const vip = within(legend).getByRole('button', { name: /^VIP/ });
     await user.click(vip);
     expect(dance).toHaveAttribute('aria-pressed', 'false');
     // В секторе B две зоны: сектор не приглушён, приглушены места трибуны.
@@ -155,13 +156,10 @@ describe('схема зала посетителя', () => {
     const session = stadiumSession();
     renderAt(seatsUrl(session));
     const list = await screen.findByRole('region', { name: 'Сектора' });
-    const rows = within(list).getAllByRole('listitem');
-    expect(rows.map((row) => row.firstChild.nextSibling.firstChild.textContent)).toEqual([
-      'Танцпол',
-      'Сектор A',
-      'Сектор B',
-      'Сектор C',
-    ]);
+    const rows = within(list).getAllByRole('button');
+    expect(
+      rows.map((row) => row.querySelector('span + span > span').textContent)
+    ).toEqual(['Танцпол', 'Сектор A', 'Сектор B', 'Сектор C']);
     expect(rows[0]).toHaveTextContent(/без мест · (осталось|продано)/);
     expect(rows[2]).toHaveTextContent(/от \d/);
   });

@@ -24,6 +24,25 @@
   transition: opacity 0.14s;
 }
 
+.section[data-opens='true'],
+.seat[data-seat-id] {
+  cursor: pointer;
+}
+
+.section[data-opens='true']:hover .block,
+.section[data-open='true'] .block {
+  stroke: var(--color-ink);
+}
+
+.section[data-open='true'] .block {
+  stroke-width: 2;
+}
+
+.seat[data-seat-id]:hover rect {
+  stroke: var(--color-ink);
+  stroke-width: 0.8;
+}
+
 .section[data-dimmed='true'] {
   opacity: 0.3;
 }
@@ -89,6 +108,11 @@
 
 .seat[data-state='selected'] rect {
   fill: var(--color-ink);
+}
+
+.seat[data-lost='true'] rect {
+  stroke: var(--color-status-error);
+  stroke-width: 1.6;
 }
 
 .seat[data-dimmed='true'] {

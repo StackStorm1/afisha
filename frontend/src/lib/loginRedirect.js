@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 // аккаунта. При прямом заходе на /login строки нет.
 export const LOGIN_REASONS = {
   seats: 'Войдите, чтобы выбрать места',
+  book: 'Войдите, чтобы забронировать места',
   favorite: 'Войдите, чтобы сохранить в избранное',
   orders: 'Войдите, чтобы увидеть свои заказы',
   favorites: 'Войдите, чтобы открыть избранное',

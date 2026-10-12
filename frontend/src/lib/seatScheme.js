@@ -75,11 +75,20 @@ export function sectionSummary(section, zonesById) {
   };
 }
 
-// Состояние места глазами посетителя: свои удержанные — выбранные, чужие
-// удержанные и оплаченные — занятые.
-export function seatState(seat) {
+// Состояние места глазами посетителя: выбранное сейчас и свои удержанные —
+// выбранные, чужие удержанные и оплаченные — занятые.
+export function seatState(seat, selected = false) {
   if (seat.held_by_me) return 'selected';
-  return seat.status === 'free' ? 'free' : 'taken';
+  if (seat.status !== 'free') return 'taken';
+  return selected ? 'selected' : 'free';
+}
+
+// Места мельче этого шага (в единицах холста) мышью прямо на схеме не
+// выбираются: клик по сектору открывает его крупно.
+export const SEAT_CLICK_MIN_PITCH = 10;
+
+export function seatsClickable(section) {
+  return section.kind === 'seated' && seatPitch(section.seats) >= SEAT_CLICK_MIN_PITCH;
 }
 
 export function sectionBounds(section) {

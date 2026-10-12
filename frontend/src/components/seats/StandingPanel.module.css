@@ -1,0 +1,335 @@
+.panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 340px;
+  /* Не выше схемы и не выше экрана за вычетом шапки и нижней панели:
+     иначе «Готово» уходит под нижнюю панель. */
+  max-height: min(calc(100% - 32px), calc(100vh - 220px));
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-control);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.6);
+  overflow: auto;
+  z-index: 5;
+}
+
+.panel:focus {
+  outline: none;
+}
+
+.panel:focus-visible {
+  outline: 2px solid var(--color-link);
+}
+
+/* Шапка тонирована цветом зоны. */
+.head {
+  padding: 18px 20px 20px;
+  background: color-mix(in srgb, var(--zone) 19%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.headRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--zone);
+  color: #fff;
+}
+
+.close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(11, 11, 17, 0.5);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: rgba(11, 11, 17, 0.7);
+}
+
+.name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.priceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.price {
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.per {
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.body {
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  flex: 1;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leftRow {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.cap {
+  color: var(--color-ink-muted);
+}
+
+.track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: #23232f;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--zone);
+}
+
+.qty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.qtyLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+}
+
+.stepper[data-error='true'] {
+  border-color: var(--color-status-error);
+}
+
+.dec,
+.inc {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  font-size: 22px;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.dec {
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+}
+
+.dec:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.inc {
+  border: 0;
+  background: var(--zone);
+  color: #fff;
+}
+
+.inc:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.dec:disabled,
+.inc:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.count {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.quick {
+  display: flex;
+  gap: 8px;
+}
+
+.quickButton {
+  flex: 1;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.quickButton[aria-pressed='true'] {
+  background: var(--zone);
+  border-color: var(--zone);
+  color: #fff;
+}
+
+.quickButton:disabled {
+  color: var(--color-ink-weak);
+  cursor: default;
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink-muted);
+}
+
+.note[data-limit='true'] {
+  color: var(--color-status-warning);
+}
+
+.conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.conflictText {
+  margin: 0;
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-status-error);
+}
+
+.take {
+  align-self: flex-start;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-status-error);
+  background: transparent;
+  color: var(--color-status-error);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.take:hover {
+  background: rgba(255, 143, 164, 0.1);
+}
+
+.foot {
+  margin-top: 20px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sum {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sumLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.sumValue {
+  font-family: var(--font-mono);
+  font-size: 20px;
+}
+
+.done {
+  height: 48px;
+  padding: 0 26px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.done:hover {
+  background: var(--color-accent-hover);
+}
+
+/* Телефон: нижний лист поверх экрана. */
+@media (max-width: 720px) {
+  .panel {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 88vh;
+    border-radius: 20px 20px 0 0;
+    z-index: 60;
+  }
+
+  .head {
+    border-radius: 20px 20px 0 0;
+  }
+
+  .name {
+    font-size: 28px;
+  }
+}
