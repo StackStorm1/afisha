@@ -11,7 +11,10 @@ function Row({ row }) {
     if (!el) return;
     el.scrollBy({
       left: direction * Math.round(el.clientWidth * 0.8),
-      behavior: 'smooth',
+      // Плавность из JS глобальное правило reduced-motion в CSS не снимает.
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
     });
   }
 

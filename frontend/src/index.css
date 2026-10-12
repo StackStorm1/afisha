@@ -109,6 +109,23 @@ input {
   color: var(--color-ink-secondary);
 }
 
+/* Область нажатия не меньше 44×44 при меньшем видимом элементе: чипы 36px,
+   текстовые ссылки. Невидимый слой по центру добирает недостающее, вид и
+   раскладка не меняются. */
+.u-hit {
+  position: relative;
+}
+
+.u-hit::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

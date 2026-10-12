@@ -6,13 +6,13 @@ export default function Footer() {
       <div className={styles.inner}>
         <span className={styles.logo}>Stack Afisha</span>
         <div className={styles.links}>
-          <a className={styles.link} href="#feed">
+          <a className={`${styles.link} u-hit`} href="#feed">
             Организаторам
           </a>
-          <a className={styles.link} href="#feed">
+          <a className={`${styles.link} u-hit`} href="#feed">
             Возврат билетов
           </a>
-          <a className={styles.link} href="#feed">
+          <a className={`${styles.link} u-hit`} href="#feed">
             Поддержка
           </a>
         </div>

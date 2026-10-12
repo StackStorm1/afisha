@@ -78,6 +78,19 @@ describe('Ценовой фильтр в строке фильтров', () => {
     expect(screen.queryByLabelText('Цена до, ₽')).toBeNull();
   });
 
+  it('Escape из панели возвращает фокус на чип', async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    const chip = screen.getByRole('button', { name: /Цена/ });
+    await user.click(chip);
+    await user.click(screen.getByLabelText('Цена до, ₽'));
+    await user.keyboard('{Escape}');
+
+    expect(chip).toHaveFocus();
+    expect(chip).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('старая ссылка ?price=1500 читается как верхняя граница', () => {
     renderHome('/?price=1500');
 

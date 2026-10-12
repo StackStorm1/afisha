@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Header from '../components/Header.jsx';
@@ -27,7 +27,7 @@ const TABS = [
 function OrderRow({ order, past, onCancel }) {
   const row = buildOrderRow(order);
   return (
-    <li className={styles.row}>
+    <li className={styles.row} data-order-id={order.id}>
       <Link
         to={`/events/${row.eventId}`}
         className={styles.poster}
@@ -95,6 +95,10 @@ export default function OrdersPage() {
   const userId = useAuth((s) => s.user?.id);
   const [tab, setTab] = useState('upcoming');
   const [cancelling, setCancelling] = useState(null);
+  // Куда вернуть фокус, когда диалог отмены закрылся: на «Отменить заказ»
+  // той же строки, а если кнопки больше нет (заказ отменён) — на название.
+  const [focusAfter, setFocusAfter] = useState(null);
+  const mainRef = useRef(null);
   const queryClient = useQueryClient();
 
   // Через react-query, а не напрямую: фоновое истечение броней сбрасывает
@@ -106,11 +110,36 @@ export default function OrdersPage() {
 
   const cancel = useMutation({
     mutationFn: (order) => cancelOrder(order.id, { userId }),
-    onSuccess: () => {
+    onSuccess: (_, order) => {
+      setFocusAfter({ orderId: order.id, cancelled: true });
       setCancelling(null);
       queryClient.invalidateQueries({ queryKey: ['orders', userId] });
     },
   });
+
+  useEffect(() => {
+    if (!focusAfter || cancelling) return;
+    const row = mainRef.current?.querySelector(`[data-order-id="${focusAfter.orderId}"]`);
+    const button = row?.querySelector('button');
+    // После отмены ждём, пока перечитанный список уберёт кнопку из строки.
+    if (focusAfter.cancelled && button) return;
+    (button ?? row?.querySelector('a:not([tabindex="-1"])'))?.focus();
+    setFocusAfter(null);
+  }, [focusAfter, cancelling, orders]);
+
+  // Вкладки переключаются стрелками, в порядке Tab стоит только выбранная.
+  function onTabsKeyDown(e) {
+    const index = TABS.findIndex((t) => t.key === tab);
+    let next;
+    if (e.key === 'ArrowRight') next = (index + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft') next = (index - 1 + TABS.length) % TABS.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = TABS.length - 1;
+    else return;
+    e.preventDefault();
+    setTab(TABS[next].key);
+    document.getElementById(`orders-tab-${TABS[next].key}`)?.focus();
+  }
 
   function openCancel(order) {
     cancel.reset();
@@ -121,6 +150,7 @@ export default function OrdersPage() {
     // Ошибка могла означать, что заказ уже в другом статусе (истёк, начался
     // сеанс) — перечитываем список, чтобы кнопка не осталась висеть.
     if (cancel.isError) queryClient.invalidateQueries({ queryKey: ['orders', userId] });
+    setFocusAfter({ orderId: cancelling.id, cancelled: false });
     setCancelling(null);
   }
 
@@ -139,14 +169,19 @@ export default function OrdersPage() {
   return (
     <>
       <Header />
-      <main className={styles.main}>
+      <main className={styles.main} ref={mainRef}>
         <h1 className={styles.heading}>Мои заказы</h1>
 
         {/* До ответа не рисуем ни вкладки, ни пустое состояние: иначе на
             мгновение мелькало бы «У вас пока нет заказов». */}
         {!isPending && (
           <>
-            <div className={styles.tabs} role="tablist" aria-label="Заказы">
+            <div
+              className={styles.tabs}
+              role="tablist"
+              aria-label="Заказы"
+              onKeyDown={onTabsKeyDown}
+            >
               {TABS.map((t) => {
                 const count = split[t.key].length;
                 return (
@@ -154,8 +189,10 @@ export default function OrdersPage() {
                     key={t.key}
                     type="button"
                     role="tab"
+                    id={`orders-tab-${t.key}`}
                     aria-selected={tab === t.key}
-                    className={styles.tab}
+                    tabIndex={tab === t.key ? 0 : -1}
+                    className={`${styles.tab} u-hit`}
                     onClick={() => setTab(t.key)}
                   >
                     {t.label}
@@ -168,7 +205,11 @@ export default function OrdersPage() {
             {emptyText ? (
               <EmptyOrders text={emptyText} />
             ) : (
-              <div className={styles.groups} role="tabpanel">
+              <div
+                className={styles.groups}
+                role="tabpanel"
+                aria-labelledby={`orders-tab-${tab}`}
+              >
                 {groups.map((group) => (
                   <section key={group.key} className={styles.group}>
                     {group.label && (

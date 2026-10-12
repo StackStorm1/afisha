@@ -103,7 +103,7 @@ function Editor({ initial }) {
   return (
     <div className={styles.page}>
       <header className={styles.bar}>
-        <Link to="/admin/venues" className={styles.back}>
+        <Link to="/admin/venues" className={`${styles.back} u-hit`}>
           <span aria-hidden="true">←</span> Площадки
         </Link>
         <h1 className={styles.title}>Редактор схемы</h1>
@@ -258,7 +258,7 @@ export default function LayoutEditorPage() {
     return (
       <div className={styles.missing}>
         <h1 className={styles.title}>Конфигурация не найдена</h1>
-        <Link to="/admin/venues" className={styles.back}>
+        <Link to="/admin/venues" className={`${styles.back} u-hit`}>
           <span aria-hidden="true">←</span> Площадки
         </Link>
       </div>

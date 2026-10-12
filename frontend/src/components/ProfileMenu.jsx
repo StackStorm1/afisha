@@ -14,6 +14,7 @@ export default function ProfileMenu() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const triggerRef = useRef(null);
   const menuId = useId();
 
   // Переход на другую страницу закрывает меню.
@@ -26,8 +27,11 @@ export default function ProfileMenu() {
     function onPointerDown(e) {
       if (!rootRef.current?.contains(e.target)) setOpen(false);
     }
+    // Esc возвращает фокус на «Профиль», если он был внутри меню.
     function onKeyDown(e) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      if (rootRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+      setOpen(false);
     }
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -48,6 +52,7 @@ export default function ProfileMenu() {
   return (
     <div className={styles.root} ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.trigger}
         data-open={open}

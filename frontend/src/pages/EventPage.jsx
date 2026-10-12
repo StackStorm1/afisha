@@ -114,13 +114,13 @@ export default function EventPage() {
       <Header />
       <main className={styles.main}>
         <nav className={styles.breadcrumb} aria-label="Хлебные крошки">
-          <Link to="/" className={styles.breadcrumbLink}>
+          <Link to="/" className={`${styles.breadcrumbLink} u-hit`}>
             Главная
           </Link>
           <span className={styles.breadcrumbSep}>/</span>
           <Link
             to={`/?category=${event.category.slug}`}
-            className={styles.breadcrumbLink}
+            className={`${styles.breadcrumbLink} u-hit`}
           >
             {event.category.name}
           </Link>
@@ -354,7 +354,10 @@ export default function EventPage() {
               </span>
               <div className={styles.asideDivider} />
               <span className={styles.venueCardAddress}>{hallLabel}</span>
-              <Link to={`/?venue=${venue.id}`} className={styles.venueCardLink}>
+              <Link
+                to={`/?venue=${venue.id}`}
+                className={`${styles.venueCardLink} u-hit`}
+              >
                 Все события на этой площадке →
               </Link>
             </div>

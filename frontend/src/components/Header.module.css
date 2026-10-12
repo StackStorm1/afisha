@@ -128,7 +128,8 @@
   transition: background 0.12s;
 }
 
-.searchItem:hover {
+.searchItem:hover,
+.searchItem[aria-selected='true'] {
   background: var(--color-surface-hover);
 }
 

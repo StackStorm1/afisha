@@ -12,6 +12,7 @@ export default function FilterPopover({
   children,
 }) {
   const wrapRef = useRef(null);
+  const chipRef = useRef(null);
   const panelId = useId();
 
   useEffect(() => {
@@ -20,8 +21,12 @@ export default function FilterPopover({
     function handlePointerDown(event) {
       if (!wrapRef.current?.contains(event.target)) onClose();
     }
+    // Esc закрывает панель и возвращает фокус на чип: иначе фокус из
+    // исчезнувшей панели упал бы в начало страницы.
     function handleKeyDown(event) {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      if (wrapRef.current?.contains(document.activeElement)) chipRef.current?.focus();
+      onClose();
     }
 
     document.addEventListener('mousedown', handlePointerDown);
@@ -35,8 +40,9 @@ export default function FilterPopover({
   return (
     <div className={styles.wrap} ref={wrapRef}>
       <button
+        ref={chipRef}
         type="button"
-        className={styles.chip}
+        className={`${styles.chip} u-hit`}
         data-active={active}
         aria-expanded={open}
         aria-controls={panelId}

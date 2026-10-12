@@ -101,6 +101,32 @@ describe('OrdersPage', () => {
     expect(screen.queryByRole('heading', { name: /Позже/ })).not.toBeInTheDocument();
   });
 
+  it('вкладки переключаются стрелками, в порядке Tab только выбранная', async () => {
+    visitor(DEMO_USER);
+    const user = userEvent.setup();
+    renderOrders();
+
+    const upcomingTab = await screen.findByRole('tab', { name: /Предстоящие/ });
+    const pastTab = screen.getByRole('tab', { name: /Прошедшие/ });
+    expect(upcomingTab).toHaveAttribute('tabindex', '0');
+    expect(pastTab).toHaveAttribute('tabindex', '-1');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName(/Предстоящие/);
+
+    upcomingTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(pastTab).toHaveFocus();
+    expect(pastTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName(/Прошедшие/);
+
+    // По кругу: с последней на первую.
+    await user.keyboard('{ArrowRight}');
+    expect(upcomingTab).toHaveFocus();
+    await user.keyboard('{End}');
+    expect(pastTab).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{Home}');
+    expect(upcomingTab).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('показывает статусы заказов словами', async () => {
     visitor(DEMO_USER);
     renderOrders();
@@ -136,6 +162,8 @@ describe('OrdersPage', () => {
       screen.queryByRole('button', { name: /^Отменить заказ «/ })
     ).not.toBeInTheDocument();
     expect(getOrder(order.id).status).toBe('cancelled');
+    // Кнопки больше нет — фокус на названии события в той же строке.
+    expect(screen.getByRole('link', { name: order.session.event.title })).toHaveFocus();
   });
 
   it('«Не отменять» закрывает диалог без изменений', async () => {
@@ -147,6 +175,7 @@ describe('OrdersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Не отменять' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Отменить заказ «/ })).toHaveFocus();
     expect(getOrder(order.id).status).toBe('pending');
     expect(screen.getByText('Ожидает оплаты')).toBeInTheDocument();
   });
