@@ -6,6 +6,7 @@ import AuthPage from './pages/AuthPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import FavoritesPage from './pages/FavoritesPage.jsx';
 import SeatsPage from './pages/SeatsPage.jsx';
+import CheckoutPage from './pages/CheckoutPage.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import RequireAdmin from './components/RequireAdmin.jsx';
 import AdminLayout from './pages/admin/AdminLayout.jsx';
@@ -57,6 +58,14 @@ export default function App() {
           element={
             <RequireAuth reason="orders">
               <OrdersPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/checkout/:orderId"
+          element={
+            <RequireAuth reason="checkout">
+              <CheckoutPage />
             </RequireAuth>
           }
         />

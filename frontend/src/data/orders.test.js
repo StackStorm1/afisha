@@ -171,6 +171,22 @@ describe('orders mock — POST /orders (создание брони)', () => {
 });
 
 describe('orders mock — POST /orders/{id}/pay (US-14, US-16, BR-05)', () => {
+  it('чужой заказ: GET отдаёт null, оплата — ORDER_NOT_FOUND (BR-07)', () => {
+    const { session, freeSeats } = freeSession();
+    const order = createOrder({
+      sessionId: session.id,
+      seatIds: [freeSeats[0].id],
+      userId: 'owner',
+    });
+
+    expect(getOrder(order.id, { userId: 'owner' })).toBe(order);
+    expect(getOrder(order.id, { userId: 'stranger' })).toBeNull();
+    expect(() => payOrder(order.id, { userId: 'stranger' })).toThrow(
+      expect.objectContaining({ code: 'ORDER_NOT_FOUND' })
+    );
+    expect(getOrder(order.id).status).toBe('pending');
+  });
+
   it('success переводит заказ в paid, expires_at обнуляется', () => {
     const { session, freeSeats } = freeSession();
     const order = createOrder({ sessionId: session.id, seatIds: [freeSeats[0].id] });

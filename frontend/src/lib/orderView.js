@@ -41,6 +41,52 @@ export function isCancellable(order, now = new Date()) {
   );
 }
 
+// Бронь ещё можно оплатить: ждёт оплаты или оплата не прошла (US-16), и
+// время удержания не вышло. Фоновая задача отменяет такие заказы раз в
+// минуту, поэтому по часам проверяем сами.
+export function isPayable(order, now = new Date()) {
+  return (
+    (order.status === 'pending' || order.status === 'failed') &&
+    order.expires_at != null &&
+    new Date(order.expires_at) > now
+  );
+}
+
+// Строки билетов для оформления: место — строкой, стоячая зона — одной
+// строкой с количеством и суммой. Порядок — как в заказе.
+export function ticketLines(seats) {
+  const lines = [];
+  const standing = new Map();
+  for (const seat of seats) {
+    if (seat.section.kind === 'standing') {
+      const line = standing.get(seat.section.id);
+      if (line) {
+        line.count += 1;
+        line.amount += Number(seat.price);
+        continue;
+      }
+      const created = {
+        key: seat.section.id,
+        title: seat.section.name,
+        zone: seat.price_zone.name,
+        count: 1,
+        amount: Number(seat.price),
+      };
+      standing.set(seat.section.id, created);
+      lines.push(created);
+    } else {
+      lines.push({
+        key: seat.id,
+        title: `${seat.section.name} · Ряд ${seat.row_label}, место ${seat.seat_label}`,
+        zone: seat.price_zone.name,
+        count: 1,
+        amount: Number(seat.price),
+      });
+    }
+  }
+  return lines.map(({ amount, ...line }) => ({ ...line, price: formatPrice(amount) }));
+}
+
 // «пн, 14 сен»
 function formatDayLabel(iso) {
   const date = new Date(iso);

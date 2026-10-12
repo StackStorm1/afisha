@@ -10,6 +10,13 @@
   font-size: 14px;
 }
 
+.banner[data-plain='true'] {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
 .label {
   color: var(--color-ink-secondary);
 }
@@ -25,7 +32,7 @@
   color: var(--color-status-warning);
 }
 
-.link {
+.action {
   margin-left: auto;
 }
 

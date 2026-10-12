@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { formatCountdown, useCountdown } from '../../lib/useCountdown.js';
 import styles from './HoldBanner.module.css';
 
@@ -13,9 +12,11 @@ function announcement(ms) {
   return '';
 }
 
-// US-12, BR-02: места удержаны до expires_at — ненавязчивый обратный отсчёт
-// и ссылка на заказ. По истечении зовёт onExpire один раз.
-export default function HoldBanner({ order, onExpire }) {
+// US-12, BR-02: места удержаны до expires_at — ненавязчивый обратный отсчёт.
+// action — что предложить рядом (на схеме — переход к оплате). По истечении
+// зовёт onExpire один раз. plain — без своей рамки, когда плашка уже стоит
+// внутри панели (оформление заказа).
+export default function HoldBanner({ order, onExpire, action = null, plain = false }) {
   const left = useCountdown(order.expires_at);
   const expiredRef = useRef(false);
 
@@ -31,7 +32,7 @@ export default function HoldBanner({ order, onExpire }) {
   const urgent = left <= ANNOUNCE_AT[1];
 
   return (
-    <div className={styles.banner} data-urgent={urgent}>
+    <div className={styles.banner} data-urgent={urgent} data-plain={plain}>
       <span className={styles.label}>
         {tickets > 1 ? 'Билеты удержаны' : 'Билет удержан'} ещё
       </span>
@@ -41,9 +42,7 @@ export default function HoldBanner({ order, onExpire }) {
       <span className={styles.srOnly} aria-live="polite">
         {announcement(left)}
       </span>
-      <Link to="/account/orders" className={styles.link}>
-        Заказ в «Моих заказах» →
-      </Link>
+      {action && <span className={styles.action}>{action}</span>}
     </div>
   );
 }

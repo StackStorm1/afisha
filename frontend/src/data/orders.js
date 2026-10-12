@@ -214,12 +214,25 @@ export function createOrder({ sessionId, seatIds = [], standing = [], userId }) 
   return order;
 }
 
+// Исход тестового платёжного шлюза по умолчанию. На бэкенде его задаёт
+// тестовая реализация PaymentGateway (requirements.md §4), в моке — параметр
+// адреса: /checkout/…?pay=decline показывает отказ без правки кода.
+function gatewayOutcome() {
+  if (typeof window === 'undefined') return 'success';
+  return new URLSearchParams(window.location.search).get('pay') === 'decline'
+    ? 'fail'
+    : 'success';
+}
+
 // Мок POST /orders/{id}/pay (US-14, US-16, BR-05). `outcome` эмулирует
 // PaymentGateway из requirements.md — управляемый исход, а не случайность,
 // чтобы можно было детерминированно проверить оба сценария (успех/отказ).
-export function payOrder(orderId, { outcome = 'success' } = {}) {
+// userId заменяет токен: чужой заказ — ORDER_NOT_FOUND (BR-07).
+export function payOrder(orderId, { outcome = gatewayOutcome(), userId } = {}) {
   const order = ordersById.get(orderId);
-  if (!order) throw new OrderError('ORDER_NOT_FOUND', 'Заказ не найден');
+  if (!order || (userId && ownerByOrderId.get(orderId) !== userId)) {
+    throw new OrderError('ORDER_NOT_FOUND', 'Заказ не найден');
+  }
 
   if (order.status === 'paid') {
     throw new OrderError('ORDER_ALREADY_PAID', 'Заказ уже оплачен');
@@ -320,8 +333,13 @@ export function listMyOrders({ userId, status, page = 1, per_page = 20 } = {}) {
   };
 }
 
-export function getOrder(orderId) {
-  return ordersById.get(orderId) ?? null;
+// Мок GET /orders/{id}. С userId — как на бэкенде: чужой заказ не отдаётся
+// (BR-07), как и несуществующий.
+export function getOrder(orderId, { userId } = {}) {
+  if (userId === DEMO_USER.id) seedDemoOrders();
+  const order = ordersById.get(orderId);
+  if (!order || (userId && ownerByOrderId.get(orderId) !== userId)) return null;
+  return order;
 }
 
 // --- Фоновое истечение броней (BR-02, requirements.md §7: освобождение мест

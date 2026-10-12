@@ -293,6 +293,31 @@
   color: var(--color-status-error);
 }
 
+.payLink {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.payLink:hover {
+  text-decoration: underline;
+}
+
+/* Подтверждение оплаты над списком (US-14). */
+.paid {
+  margin: -8px 0 24px;
+  padding: 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: var(--color-surface);
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 15px;
+}
+
 /* --- Пустое состояние --- */
 
 .empty {

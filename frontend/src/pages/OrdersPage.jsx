@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
@@ -9,8 +9,10 @@ import { cancelOrder, listMyOrders } from '../data/orders.js';
 import { useAuth } from '../store/useAuth.js';
 import {
   buildOrderRow,
+  formatOrderNumber,
   groupUpcoming,
   isCancellable,
+  isPayable,
   splitOrders,
 } from '../lib/orderView.js';
 import styles from './OrdersPage.module.css';
@@ -24,7 +26,7 @@ const TABS = [
   { key: 'past', label: 'Прошедшие', empty: 'Прошедших заказов нет' },
 ];
 
-function OrderRow({ order, past, onCancel }) {
+function OrderRow({ order, past, payable, onCancel }) {
   const row = buildOrderRow(order);
   return (
     <li className={styles.row} data-order-id={order.id}>
@@ -65,6 +67,15 @@ function OrderRow({ order, past, onCancel }) {
           <span aria-hidden="true">{row.glyph}</span>
           {row.label}
         </span>
+        {payable && (
+          <Link
+            to={`/checkout/${order.id}`}
+            className={`${styles.payLink} u-hit`}
+            aria-label={`Оплатить заказ «${row.title}», ${row.number}`}
+          >
+            Оплатить →
+          </Link>
+        )}
         {onCancel && (
           <button
             type="button"
@@ -93,6 +104,8 @@ function EmptyOrders({ text }) {
 
 export default function OrdersPage() {
   const userId = useAuth((s) => s.user?.id);
+  // С оформления заказа после успешной оплаты (US-14).
+  const paidOrderId = useLocation().state?.paidOrderId ?? null;
   const [tab, setTab] = useState('upcoming');
   const [cancelling, setCancelling] = useState(null);
   // Куда вернуть фокус, когда диалог отмены закрылся: на «Отменить заказ»
@@ -171,6 +184,13 @@ export default function OrdersPage() {
       <Header />
       <main className={styles.main} ref={mainRef}>
         <h1 className={styles.heading}>Мои заказы</h1>
+        {paidOrderId && (
+          <p className={styles.paid} role="status">
+            <span aria-hidden="true">✓</span>
+            Оплата прошла. {formatOrderNumber(paidOrderId)} оплачен, билеты — в
+            «Предстоящих».
+          </p>
+        )}
 
         {/* До ответа не рисуем ни вкладки, ни пустое состояние: иначе на
             мгновение мелькало бы «У вас пока нет заказов». */}
@@ -224,6 +244,7 @@ export default function OrdersPage() {
                           key={order.id}
                           order={order}
                           past={tab === 'past'}
+                          payable={isPayable(order, now)}
                           onCancel={isCancellable(order, now) ? openCancel : null}
                         />
                       ))}

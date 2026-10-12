@@ -237,15 +237,24 @@ describe('бронирование', () => {
     expect(await screen.findByText('1 билет')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Забронировать' }));
 
-    expect(await screen.findByRole('timer')).toHaveTextContent(/^1[45]:\d\d$/);
-    // Свои удержанные места на схеме — выбранные, выбор для новой брони пуст.
+    // Бронь создана — сразу оформление заказа с таймером удержания.
+    expect(
+      await screen.findByRole('heading', { name: 'Оформление заказа' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toHaveTextContent(/^1[45]:\d\d$/);
     const held = getSeatMap(session.id, {
       userId: useAuth.getState().user.id,
     }).sections[0].seats.find((s) => s.id === seatId);
     expect(held).toMatchObject({ status: 'held', held_by_me: true });
+
+    // На схеме своё место выбранное, выбор для новой брони пуст, рядом с
+    // таймером — путь обратно к оплате.
+    await user.click(screen.getByRole('link', { name: /К схеме зала/ }));
+    await scheme();
     expect(
       screen.getByText('Выберите места на схеме или количество в стоячей зоне')
     ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'К оплате →' })).toBeInTheDocument();
   });
 });
 

@@ -16,6 +16,7 @@ import {
 } from '../data/events.js';
 import { getSeatMap } from '../data/seatMap.js';
 import { createOrder, listMyOrders } from '../data/orders.js';
+import { isPayable } from '../lib/orderView.js';
 import { useAuth } from '../store/useAuth.js';
 import { useSeatSelection, useSessionSelection } from '../store/useSeatSelection.js';
 import { loginState } from '../lib/loginRedirect.js';
@@ -224,7 +225,10 @@ export default function SeatsPage() {
   // освобождает места раз в минуту; до неё места таких броней показываем
   // занятыми, а не своими.
   const [expiredOrders, setExpiredOrders] = useState([]);
-  const [expiredNotice, setExpiredNotice] = useState(false);
+  // Сюда же возвращает оформление заказа, если бронь истекла там.
+  const [expiredNotice, setExpiredNotice] = useState(
+    () => location.state?.bookingExpired === true
+  );
   // Конфликты брони (409): места, которые заняли, пока человек выбирал, и
   // стоячая зона, где осталось меньше, чем выбрано.
   const [lost, setLost] = useState(null);
@@ -244,26 +248,34 @@ export default function SeatsPage() {
     queryFn: () => getSeatMap(sessionId, { userId }),
     enabled: belongs && session?.status === 'active',
   });
-  const seatMap = useMemo(
-    () => (rawSeatMap ? withoutHolds(rawSeatMap, expiredOrders) : null),
-    [rawSeatMap, expiredOrders]
-  );
 
   // Активная бронь на этот сеанс — из того же запроса, что «Мои заказы».
+  // Неудачная оплата бронь не снимает (US-16), её тоже можно оплатить.
   const { data: orders = [] } = useQuery({
     queryKey: ['orders', userId],
     queryFn: () => listMyOrders({ userId, per_page: 100 }).data,
     enabled: authorized,
   });
-  const hold = orders
-    .filter(
+  const { hold, released } = useMemo(() => {
+    const own = orders.filter(
       (order) =>
-        order.status === 'pending' &&
         order.session.id === sessionId &&
-        !expiredOrders.some((expired) => expired.id === order.id) &&
-        new Date(order.expires_at).getTime() > Date.now()
-    )
-    .sort((a, b) => a.expires_at.localeCompare(b.expires_at))[0];
+        (order.status === 'pending' || order.status === 'failed') &&
+        !expiredOrders.some((expired) => expired.id === order.id)
+    );
+    return {
+      hold: own
+        .filter((order) => isPayable(order))
+        .sort((a, b) => a.expires_at.localeCompare(b.expires_at))[0],
+      // Время вышло, но фоновая очистка ещё не прошла: такие брони, как и
+      // истёкшие при открытой странице, показываем занятыми, а не своими.
+      released: [...expiredOrders, ...own.filter((order) => !isPayable(order))],
+    };
+  }, [orders, sessionId, expiredOrders]);
+  const seatMap = useMemo(
+    () => (rawSeatMap ? withoutHolds(rawSeatMap, released) : null),
+    [rawSeatMap, released]
+  );
 
   const onHoldExpired = useCallback(
     (order) => {
@@ -302,12 +314,11 @@ export default function SeatsPage() {
         standing: picked.standing,
         userId,
       }),
-    onSuccess: () => {
+    onSuccess: (order) => {
       clearSelection(sessionId);
-      setStandingId(null);
-      setExpiredNotice(false);
       queryClient.invalidateQueries({ queryKey: ['seatMap', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      navigate(`/checkout/${order.id}`);
     },
     onError: (error) => {
       if (error.code === 'SEAT_ALREADY_TAKEN') {
@@ -520,7 +531,14 @@ export default function SeatsPage() {
                 onOpen={openSection}
               />
             )}
-            {hold && <HoldBanner key={hold.id} order={hold} onExpire={onHoldExpired} />}
+            {hold && (
+              <HoldBanner
+                key={hold.id}
+                order={hold}
+                onExpire={onHoldExpired}
+                action={<Link to={`/checkout/${hold.id}`}>К оплате →</Link>}
+              />
+            )}
             {expiredNotice && (
               <p className={styles.booked} role="alert">
                 Время брони истекло, места освобождены. Выберите места заново.
