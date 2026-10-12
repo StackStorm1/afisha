@@ -4,7 +4,7 @@ import { formatPrice, formatTime, pluralizeSeats } from './format.js';
 const LEFT_WARNING_THRESHOLD = 20;
 
 // Строка сеанса в списке «Сеансы» на странице события.
-export function buildSessionRowView(session, { authorized }) {
+export function buildSessionRowView(session) {
   if (session.status !== 'active') {
     return {
       time: formatTime(session.starts_at),
@@ -62,6 +62,6 @@ export function buildSessionRowView(session, { authorized }) {
         : formatPrice(minAvailable),
     sold,
     cancelled: false,
-    btnLabel: sold ? 'Продано' : authorized ? 'Выбрать места' : 'Войти и выбрать места',
+    btnLabel: sold ? 'Продано' : 'Выбрать места',
   };
 }

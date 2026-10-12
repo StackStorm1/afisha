@@ -43,7 +43,7 @@ describe('buildSessionRowView — та же проверка в строке с�
     const session = findActiveSession();
     sellOutStalls(session);
 
-    const { zonesLabel } = buildSessionRowView(session, { authorized: false });
+    const { zonesLabel } = buildSessionRowView(session);
     expect(zonesLabel).toBe('Партер распродан · балкон в продаже');
   });
 });

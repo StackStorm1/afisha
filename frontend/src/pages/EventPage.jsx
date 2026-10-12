@@ -72,8 +72,7 @@ export default function EventPage() {
     );
   }
 
-  // Схемы зала ещё нет, поэтому после входа ведём к списку сеансов этого
-  // события, а не на несуществующую страницу выбора мест.
+  // Вход из баннера гостя возвращает к списку сеансов этого события.
   const seatsLoginState = loginState(
     { pathname: location.pathname, search: location.search, hash: '#sessions' },
     'seats'
@@ -81,7 +80,7 @@ export default function EventPage() {
 
   const activeSessions = allSessions.filter((s) => s.status === 'active');
   const next = nextOpenSession(activeSessions);
-  const nextView = next ? buildSessionRowView(next, { authorized }) : null;
+  const nextView = next ? buildSessionRowView(next) : null;
 
   const openPrices = activeSessions
     .map((s) => {
@@ -185,7 +184,7 @@ export default function EventPage() {
 
             <div className={styles.sessionList}>
               {daySessions.map((session) => {
-                const view = buildSessionRowView(session, { authorized });
+                const view = buildSessionRowView(session);
                 return (
                   <div key={session.id} className={styles.sessionRow}>
                     <div className={styles.sessionTime}>
@@ -211,11 +210,8 @@ export default function EventPage() {
                         to={
                           view.sold
                             ? '#'
-                            : authorized
-                              ? `/events/${event.id}/sessions/${session.id}/seats`
-                              : '/login'
+                            : `/events/${event.id}/sessions/${session.id}/seats`
                         }
-                        state={!view.sold && !authorized ? seatsLoginState : undefined}
                         className={styles.sessionButton}
                         data-disabled={view.sold}
                         aria-disabled={view.sold}
@@ -273,15 +269,10 @@ export default function EventPage() {
                 </span>
               </div>
               <div className={styles.asideActions}>
-                {authorized ? (
-                  <a href="#sessions" className={styles.asideCta}>
-                    Выбрать места
-                  </a>
-                ) : (
-                  <Link to="/login" state={seatsLoginState} className={styles.asideCta}>
-                    Войти и купить
-                  </Link>
-                )}
+                {/* Схему зала гость смотрит без входа, поэтому и ему — к сеансам. */}
+                <a href="#sessions" className={styles.asideCta}>
+                  Выбрать места
+                </a>
                 <button
                   type="button"
                   className={styles.asideFavorite}

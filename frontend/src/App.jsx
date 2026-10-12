@@ -5,6 +5,7 @@ import EventPage from './pages/EventPage.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import FavoritesPage from './pages/FavoritesPage.jsx';
+import SeatsPage from './pages/SeatsPage.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
 import RequireAdmin from './components/RequireAdmin.jsx';
 import AdminLayout from './pages/admin/AdminLayout.jsx';
@@ -23,6 +24,13 @@ function EventPageRoute() {
   return <EventPage key={eventId} />;
 }
 
+// key={sessionId}: смена сеанса в выпадающем списке — новая схема, и
+// подсветка зоны со старой схемы на неё не переносится.
+function SeatsPageRoute() {
+  const { sessionId } = useParams();
+  return <SeatsPage key={sessionId} />;
+}
+
 export default function App() {
   return (
     <>
@@ -30,6 +38,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/events/:eventId" element={<EventPageRoute />} />
+        <Route
+          path="/events/:eventId/sessions/:sessionId/seats"
+          element={<SeatsPageRoute />}
+        />
         <Route path="/login" element={<AuthPage key="login" mode="login" />} />
         <Route path="/register" element={<AuthPage key="register" mode="register" />} />
         <Route
