@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatPrice } from '../../lib/format.js';
 import { seatState } from '../../lib/seatScheme.js';
+import { seatTip } from '../../lib/seatTip.js';
+import SchemeTip, { useSchemeTip } from './SchemeTip.jsx';
 import styles from './SectorView.module.css';
 
 // Шаг места в пикселях на трёх уровнях масштаба. Последний — 44px, чтобы
@@ -46,8 +48,31 @@ export default function SectorView({
     backRef.current?.focus();
   }, [section.id]);
 
+  const resolve = useCallback(
+    (target) => {
+      const node = target.closest?.('[data-seat]');
+      const seat = node && section.seats.find((s) => s.id === node.dataset.seat);
+      if (!seat) return null;
+      const lost = !!lostSeatIds?.has(seat.id);
+      return {
+        key: seat.id,
+        el: node,
+        anchor: 'top',
+        ...seatTip({
+          seat,
+          section,
+          zone: zones.find((zone) => zone.id === seat.price_zone_id),
+          state: seatState(seat, selectedIds.has(seat.id)),
+          lost,
+        }),
+      };
+    },
+    [section, zones, selectedIds, lostSeatIds]
+  );
+  const { tip, wrapProps } = useSchemeTip(resolve);
+
   return (
-    <div className={styles.view} style={{ '--pitch': `${pitch}px` }}>
+    <div className={styles.view} style={{ '--pitch': `${pitch}px` }} {...wrapProps}>
       <div className={styles.bar}>
         <button ref={backRef} type="button" className={styles.back} onClick={onBack}>
           <span aria-hidden="true">←</span> Весь зал
@@ -103,6 +128,7 @@ export default function SectorView({
                     key={seat.id}
                     type="button"
                     className={styles.seat}
+                    data-seat={seat.id}
                     data-state={state}
                     data-lost={lost}
                     style={
@@ -123,6 +149,7 @@ export default function SectorView({
           ))}
         </div>
       </div>
+      <SchemeTip tip={tip} />
     </div>
   );
 }

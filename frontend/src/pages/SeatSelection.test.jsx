@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -375,5 +375,55 @@ describe('удержание брони', () => {
     expect(
       getSeatMap(session.id).sections[0].seats.find((s) => s.id === seatId).status
     ).toBe('free');
+  });
+});
+
+describe('подсказка при наведении на схему', () => {
+  it('место: ряд, цена, зона и что будет по клику; после клика — «убрать»', async () => {
+    const user = userEvent.setup();
+    const session = futureSession('Большой театр');
+    const [seatId] = freeSeatIds(session, 'Зал', 1);
+    renderSeats(session);
+    const svg = await scheme();
+    const seat = getSeatMap(session.id)
+      .sections.flatMap((section) => section.seats ?? [])
+      .find((s) => s.id === seatId);
+
+    fireEvent.pointerMove(seatNode(svg, seatId).querySelector('rect'), {
+      pointerType: 'mouse',
+    });
+    const tip = screen.getByRole('tooltip');
+    expect(tip).toHaveTextContent(`Ряд ${seat.row_label}, место ${seat.seat_label}`);
+    expect(tip).toHaveTextContent('Нажмите, чтобы выбрать');
+
+    await user.click(seatNode(svg, seatId));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Нажмите, чтобы убрать');
+
+    fireEvent.pointerLeave(svg.parentElement);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('стоячая зона: цена, остаток, подсказка про количество', async () => {
+    const session = futureSession('Adrenaline Stadium');
+    renderSeats(session);
+    const svg = await scheme();
+    const dance = getSeatMap(session.id).sections.find((s) => s.kind === 'standing');
+
+    fireEvent.pointerMove(sectionNode(svg, dance.name).querySelector('polygon'), {
+      pointerType: 'mouse',
+    });
+    const tip = screen.getByRole('tooltip');
+    expect(tip).toHaveTextContent(dance.name);
+    expect(tip).toHaveTextContent(`осталось ${dance.available}`);
+    expect(tip).toHaveTextContent('Нажмите, чтобы выбрать количество');
+  });
+
+  it('касание подсказку не показывает', async () => {
+    const session = futureSession('Большой театр');
+    const [seatId] = freeSeatIds(session, 'Зал', 1);
+    renderSeats(session);
+    const svg = await scheme();
+    fireEvent.pointerMove(seatNode(svg, seatId), { pointerType: 'touch' });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });

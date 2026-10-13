@@ -1,4 +1,4 @@
-import { memo, useId } from 'react';
+import { memo, useCallback, useId, useMemo } from 'react';
 import { formatCount, formatPrice } from '../../lib/format.js';
 import {
   rowStarts,
@@ -7,6 +7,8 @@ import {
   seatsClickable,
   sectionBounds,
 } from '../../lib/seatScheme.js';
+import { sectionTip, seatTip } from '../../lib/seatTip.js';
+import SchemeTip, { useSchemeTip } from './SchemeTip.jsx';
 import styles from './HallScheme.module.css';
 
 // Место — квадрат на 78% шага сетки, со скруглением.
@@ -50,12 +52,10 @@ const Seat = memo(function Seat({
   const x = seat.x - size / 2;
   const y = seat.y - size / 2;
   const mark = size * 0.28;
-  const title = `${sectionName}, ряд ${seat.row_label}, место ${seat.seat_label} — ${
-    state === 'taken' ? 'занято' : formatPrice(price)
-  }`;
   return (
     <g
       className={styles.seat}
+      data-seat={seat.id}
       data-state={state}
       data-dimmed={dimmed}
       data-lost={lost || undefined}
@@ -63,7 +63,6 @@ const Seat = memo(function Seat({
         clickable && state !== 'taken' && !seat.held_by_me ? seat.id : undefined
       }
     >
-      <title>{title}</title>
       <rect
         x={x}
         y={y}
@@ -90,7 +89,33 @@ const Seat = memo(function Seat({
   );
 });
 
-function SeatedSeats({ section, colors, prices, highlight, selectedIds, lostSeatIds }) {
+// Подпись ряда — посередине между краем сектора и первым местом ряда.
+// Кегль один на сектор и уменьшается, чтобы самая длинная подпись влезла в
+// этот промежуток; слишком мелкий — подписей нет. Иначе подпись ложилась
+// на рамку сектора или за неё.
+const ROW_LABEL_MIN_SIZE = 5;
+
+function rowLabels(seats, pitch, left) {
+  if (pitch < ROW_LABEL_MIN_PITCH) return [];
+  const seatHalf = (pitch * SEAT_SHARE) / 2;
+  const rows = rowStarts(seats).map((row) => ({ ...row, gap: row.x - seatHalf - left }));
+  const gap = Math.min(...rows.map((row) => row.gap));
+  const chars = Math.max(...rows.map((row) => String(row.label).length));
+  // Ширина символа моноширинного шрифта — около 0,6 кегля, плюс поля.
+  const fontSize = Math.min(9, pitch * 0.5, gap / (chars * 0.6 + 0.5));
+  if (fontSize < ROW_LABEL_MIN_SIZE) return [];
+  return rows.map((row) => ({ ...row, x: left + row.gap / 2, fontSize }));
+}
+
+function SeatedSeats({
+  section,
+  left,
+  colors,
+  prices,
+  highlight,
+  selectedIds,
+  lostSeatIds,
+}) {
   const pitch = seatPitch(section.seats);
   if (pitch === 0) return null;
   const clickable = seatsClickable(section);
@@ -110,20 +135,19 @@ function SeatedSeats({ section, colors, prices, highlight, selectedIds, lostSeat
           clickable={clickable}
         />
       ))}
-      {pitch >= ROW_LABEL_MIN_PITCH &&
-        rowStarts(section.seats).map((row) => (
-          <text
-            key={row.label}
-            className={styles.rowLabel}
-            x={row.x - pitch}
-            y={row.y}
-            textAnchor="end"
-            dominantBaseline="central"
-            fontSize={Math.min(9, pitch * 0.5)}
-          >
-            {row.label}
-          </text>
-        ))}
+      {rowLabels(section.seats, pitch, left).map((row) => (
+        <text
+          key={row.label}
+          className={styles.rowLabel}
+          x={row.x}
+          y={row.y}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={row.fontSize}
+        >
+          {row.label}
+        </text>
+      ))}
     </g>
   );
 }
@@ -197,6 +221,7 @@ function Section({
       {!standing && (
         <SeatedSeats
           section={section}
+          left={x}
           colors={colors}
           prices={prices}
           highlight={highlight}
@@ -230,7 +255,7 @@ const NO_SELECTION = new Set();
 // диктором — через «Выбор без схемы», поэтому сама схема для
 // вспомогательных технологий — одно изображение с подписью. Клики ловит
 // один обработчик на всю схему: мест на стадионе почти тысяча.
-function HallScheme({
+function SchemeSvg({
   seatMap,
   colors,
   summaries,
@@ -298,6 +323,70 @@ function HallScheme({
         );
       })}
     </svg>
+  );
+}
+
+// Свг не перерисовывается, когда меняется только подсказка.
+const MemoSchemeSvg = memo(SchemeSvg);
+
+function HallScheme(props) {
+  const {
+    seatMap,
+    summaries,
+    selectedIds = NO_SELECTION,
+    lostSeatIds = NO_SELECTION,
+  } = props;
+  const index = useMemo(() => {
+    const sections = new Map(seatMap.sections.map((section) => [section.id, section]));
+    const seats = new Map();
+    for (const section of seatMap.sections) {
+      for (const seat of section.seats ?? []) seats.set(seat.id, seat);
+    }
+    const zones = new Map(seatMap.price_zones.map((zone) => [zone.id, zone]));
+    return { sections, seats, zones };
+  }, [seatMap]);
+
+  // Место — если места сектора выбираются прямо на схеме, иначе сектор
+  // целиком: стоячая зона или сектор, который открывается крупно.
+  const resolve = useCallback(
+    (target) => {
+      const sectionNode = target.closest?.('[data-section-id]');
+      const section = sectionNode && index.sections.get(sectionNode.dataset.sectionId);
+      if (!section) return null;
+      if (section.kind === 'seated' && seatsClickable(section)) {
+        const seatNode = target.closest('[data-seat]');
+        const seat = seatNode && index.seats.get(seatNode.dataset.seat);
+        if (!seat) return null;
+        const lost = lostSeatIds.has(seat.id);
+        return {
+          key: seat.id,
+          el: seatNode,
+          anchor: 'top',
+          ...seatTip({
+            seat,
+            section,
+            zone: index.zones.get(seat.price_zone_id),
+            state: seatState(seat, selectedIds.has(seat.id)),
+            lost,
+          }),
+        };
+      }
+      return {
+        key: section.id,
+        el: sectionNode.querySelector('polygon'),
+        anchor: 'center',
+        ...sectionTip(section, summaries.get(section.id)),
+      };
+    },
+    [index, summaries, selectedIds, lostSeatIds]
+  );
+  const { tip, wrapProps } = useSchemeTip(resolve);
+
+  return (
+    <div className={styles.wrap} {...wrapProps}>
+      <MemoSchemeSvg {...props} />
+      <SchemeTip tip={tip} />
+    </div>
   );
 }
 

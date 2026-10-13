@@ -108,9 +108,8 @@ describe('схема зала посетителя', () => {
     // Занятое отличается не только цветом: у него крестик.
     const taken = scheme().querySelector('[data-state="taken"]');
     expect(taken.querySelector('path')).not.toBeNull();
-    expect(taken.querySelector('title').textContent).toMatch(
-      /, ряд .+, место .+ — занято$/
-    );
+    // Системной подсказки браузера нет: рядом с подсказкой схемы их было бы две.
+    expect(taken.querySelector('title')).toBeNull();
   });
 
   it('клик по зоне в легенде подсвечивает её, повторный снимает', async () => {
