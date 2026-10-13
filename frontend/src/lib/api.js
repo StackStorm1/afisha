@@ -76,12 +76,13 @@ async function readBody(response) {
 
 // auth: true — запрос без токена не имеет смысла (кабинет, заказы); 401 на
 // таком запросе разлогинивает. На публичных ручках токен уходит, если есть
-// (схема зала отдаёт held_by_me), но 401 их не касается.
+// (схема зала отдаёт held_by_me), но 401 их не касается. token — явный
+// токен вместо текущего из стора (проверка сохранённого при старте).
 export async function apiRequest(
   path,
-  { method = 'GET', query, body, auth = false, signal } = {}
+  { method = 'GET', query, body, auth = false, token: explicitToken, signal } = {}
 ) {
-  const token = getToken();
+  const token = explicitToken ?? getToken();
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;

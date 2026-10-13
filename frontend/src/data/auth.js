@@ -1,3 +1,4 @@
+import { apiRequest, usesApi } from '../lib/api.js';
 import { uuid } from '../lib/uuid.js';
 import { readJson, writeJson } from '../lib/storage.js';
 
@@ -97,7 +98,7 @@ function respond(fn) {
 }
 
 // Мок POST /auth/register — форма ответа: AuthResponse.
-export function register({ email, password }) {
+function mockRegister({ email, password }) {
   return respond(() => {
     const normalized = normalizeEmail(email);
     const details = [];
@@ -131,7 +132,7 @@ export function register({ email, password }) {
 }
 
 // Мок POST /auth/login — форма ответа: AuthResponse.
-export function login({ email, password }) {
+function mockLogin({ email, password }) {
   return respond(() => {
     const normalized = normalizeEmail(email);
     const user = loadUsers().find((u) => u.email === normalized);
@@ -143,7 +144,7 @@ export function login({ email, password }) {
 }
 
 // Мок GET /auth/me — форма ответа: { data: UserProfile }.
-export function me(token) {
+function mockMe(token) {
   return respond(() => {
     const tokens = readJson(TOKENS_KEY, {});
     const entry = token ? tokens[token] : null;
@@ -159,9 +160,36 @@ export function me(token) {
   });
 }
 
+// POST /auth/register, /auth/login, GET /auth/me — с бэка или из мока
+// (VITE_API_AREAS). Email приводится к нижнему регистру до отправки: бэк
+// сравнивает его как есть, и «Demo@…» при входе не нашёлся бы.
+export function register({ email, password }) {
+  if (!usesApi('auth')) return mockRegister({ email, password });
+  return apiRequest('/auth/register', {
+    method: 'POST',
+    body: { email: normalizeEmail(email), password },
+  });
+}
+
+export function login({ email, password }) {
+  if (!usesApi('auth')) return mockLogin({ email, password });
+  return apiRequest('/auth/login', {
+    method: 'POST',
+    body: { email: normalizeEmail(email), password },
+  });
+}
+
+// Токен передаётся явно: /me зовётся при старте, до того как стор его
+// принял, и с ответом 401 сам стор решает, что делать.
+export function me(token) {
+  if (!usesApi('auth')) return mockMe(token);
+  return apiRequest('/auth/me', { token });
+}
+
 // Выход: в контракте ручки нет (токен просто забывается клиентом), мок
 // дополнительно отзывает токен, чтобы он не оставался валидным в «базе».
 export function revokeToken(token) {
+  if (usesApi('auth')) return;
   const tokens = readJson(TOKENS_KEY, {});
   if (token in tokens) {
     delete tokens[token];

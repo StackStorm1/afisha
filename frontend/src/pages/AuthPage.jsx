@@ -49,17 +49,36 @@ function validate(mode, { email, password }) {
   return errors;
 }
 
+// Тексты ошибок полей — свои: бэк отдаёт в details[].message сообщения
+// валидатора по-английски («value is not a valid email address…»).
+const SERVER_FIELD_ERRORS = {
+  email: () => 'Введите email в формате name@example.com',
+  password: (mode) =>
+    mode === 'register'
+      ? `Пароль должен быть не короче ${PASSWORD_MIN_LENGTH} символов`
+      : 'Неверный email или пароль',
+};
+
 // VALIDATION_ERROR с details[].field раскладывается по полям формы — так
 // серверная проверка выглядит так же, как клиентская.
-function fieldErrorsFromServer(error) {
+function fieldErrorsFromServer(mode, error) {
   if (error?.code !== 'VALIDATION_ERROR' || !Array.isArray(error.details)) return null;
   const errors = {};
   for (const item of error.details) {
-    if (item.field === 'email' || item.field === 'password') {
-      errors[item.field] = item.message;
-    }
+    const text = SERVER_FIELD_ERRORS[item.field];
+    if (text) errors[item.field] = text(mode);
   }
   return Object.keys(errors).length > 0 ? errors : null;
+}
+
+// Нет сети или сервер ответил не по контракту — у клиента API для этого
+// свои понятные тексты, они точнее общего «не удалось».
+function formErrorText(error) {
+  if (FORM_ERRORS[error?.code]) return FORM_ERRORS[error.code];
+  if (error?.code === 'NETWORK_ERROR' || /^HTTP_\d+$/.test(error?.code ?? '')) {
+    return error.message;
+  }
+  return FALLBACK_FORM_ERROR;
 }
 
 export default function AuthPage({ mode }) {
@@ -105,9 +124,9 @@ export default function AuthPage({ mode }) {
       // replace: «Назад» после входа не должна возвращать на форму.
       navigate(returnPath(redirectState), { replace: true });
     } catch (error) {
-      const serverFieldErrors = fieldErrorsFromServer(error);
+      const serverFieldErrors = fieldErrorsFromServer(mode, error);
       if (serverFieldErrors) setFieldErrors(serverFieldErrors);
-      else setFormError(FORM_ERRORS[error?.code] ?? FALLBACK_FORM_ERROR);
+      else setFormError(formErrorText(error));
       setPending(false);
     }
   }
