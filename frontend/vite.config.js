@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 // Порт фронта из требований (.env.example FRONTEND_PORT=5173)
 export default defineConfig({
   plugins: [react()],
+  // .env — общий для бэка и фронта, в корне репозитория (.env.example).
+  envDir: '..',
   server: {
     port: 5173,
   },

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as authApi from '../data/auth.js';
+import { configureApi } from '../lib/api.js';
 import { readJson, removeKey, writeJson } from '../lib/storage.js';
 
 // Токен клиента — отдельно от «базы» мок-сервера: это то, что фронт будет
@@ -53,4 +54,16 @@ export const useAuth = create((set, get) => ({
     removeKey(TOKEN_KEY);
     set({ status: 'guest', token: null, user: null });
   },
+
+  // Сервер ответил, что сессии больше нет (токен истёк или отозван): гость.
+  // Защищённая страница сама уведёт на вход с возвратом.
+  expire: () => {
+    removeKey(TOKEN_KEY);
+    set({ status: 'guest', token: null, user: null });
+  },
 }));
+
+configureApi({
+  getToken: () => useAuth.getState().token,
+  onUnauthorized: () => useAuth.getState().expire(),
+});
