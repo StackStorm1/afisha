@@ -88,8 +88,20 @@
   color: var(--color-ink-muted);
 }
 
+/* На телефоне — только значок, как у кнопок шапки рядом. */
 @media (max-width: 600px) {
   .trigger {
-    padding: 0 12px;
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .triggerLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }

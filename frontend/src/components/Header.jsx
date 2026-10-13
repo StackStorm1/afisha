@@ -92,7 +92,7 @@ export default function Header({ showFilters = false }) {
   }
 
   return (
-    <header className={styles.header}>
+    <header className={styles.header} data-filters={showFilters || undefined}>
       <div className={styles.topRow}>
         <Link to="/" className={`${styles.logo} u-hit`}>
           Stack Afisha
@@ -180,11 +180,13 @@ export default function Header({ showFilters = false }) {
           {authStatus === 'visitor' && (
             <>
               <NavLink to="/favorites" className={styles.ghostButton}>
-                <span aria-hidden="true">♡</span> Избранное{' '}
+                <span aria-hidden="true">♡</span>{' '}
+                <span className={styles.buttonLabel}>Избранное</span>{' '}
                 {favCount > 0 && <span className={styles.favCount}>{favCount}</span>}
               </NavLink>
               <NavLink to="/account/orders" className={styles.ghostButton}>
-                <span aria-hidden="true">▤</span> Мои заказы
+                <span aria-hidden="true">▤</span>{' '}
+                <span className={styles.buttonLabel}>Мои заказы</span>
               </NavLink>
               <ProfileMenu />
             </>

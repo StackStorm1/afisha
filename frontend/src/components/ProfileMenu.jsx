@@ -73,7 +73,7 @@ export default function ProfileMenu() {
           <circle cx="8" cy="5.3" r="2.6" />
           <path d="M3 13.6c0-2.76 2.24-5 5-5s5 2.24 5 5" />
         </svg>
-        Профиль
+        <span className={styles.triggerLabel}>Профиль</span>
       </button>
       {open && (
         <div id={menuId} className={styles.menu}>

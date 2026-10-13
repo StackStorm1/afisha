@@ -1,6 +1,6 @@
 .main {
   min-height: 700px;
-  padding: 72px 40px;
+  padding: 72px var(--grid-gutter);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -148,7 +148,7 @@
 @media (max-width: 640px) {
   .main {
     min-height: 0;
-    padding: 40px 16px;
+    padding: 40px var(--grid-gutter);
   }
 
   .card {

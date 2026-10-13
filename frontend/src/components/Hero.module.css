@@ -194,3 +194,26 @@
   font-size: 12px;
   color: #d6d2e0;
 }
+
+/* В одну колонку боковые карточки получают высоту по тексту, и бейдж
+   наезжал на название — держим место под бейдж. */
+@media (max-width: 900px) {
+  .sideCard {
+    min-height: 200px;
+    padding-top: 56px;
+  }
+}
+
+/* 16:9 на телефоне ниже заголовка, меты и кнопок: название обрезалось
+   сверху, а бейдж даты ложился на мету. Высота — по содержимому. */
+@media (max-width: 600px) {
+  .main {
+    aspect-ratio: auto;
+    min-height: 380px;
+    padding: 68px 20px 20px;
+  }
+
+  .mainTitle {
+    font-size: 32px;
+  }
+}

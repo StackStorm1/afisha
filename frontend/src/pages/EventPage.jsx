@@ -132,7 +132,9 @@ export default function EventPage() {
           <div className={styles.heroGradient} />
           <div className={styles.heroContent}>
             <div className={styles.heroBadges}>
-              <span className={styles.categoryBadge}>{event.category.name}</span>
+              <span className={styles.categoryBadge} data-category={event.category.code}>
+                {event.category.name}
+              </span>
               <span className={styles.plainBadge}>{event.age_rating}</span>
               <span className={styles.plainBadge}>
                 {formatDuration(event.duration_minutes)}

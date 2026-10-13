@@ -289,7 +289,7 @@
 
 @media (max-width: 600px) {
   .main {
-    padding: 0 16px 48px;
+    padding: 0 var(--grid-gutter) 48px;
   }
 
   .title {
