@@ -65,10 +65,13 @@ export function ticketLines(seats) {
         line.amount += Number(seat.price);
         continue;
       }
+      // У зоны и сектора часто одно имя («Танцпол») — не повторяем.
+      const zone =
+        seat.price_zone.name === seat.section.name ? null : seat.price_zone.name;
       const created = {
         key: seat.section.id,
         title: seat.section.name,
-        zone: seat.price_zone.name,
+        zone,
         count: 1,
         amount: Number(seat.price),
       };

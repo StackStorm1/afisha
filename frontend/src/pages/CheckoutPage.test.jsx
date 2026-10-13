@@ -159,7 +159,7 @@ describe('оформление заказа', () => {
     expect(seat).toMatchObject({ status: 'held', held_by_me: true });
     expect(screen.getByRole('timer')).toBeInTheDocument();
 
-    window.history.replaceState(null, '', '/');
+    window.history.replaceState(null, '', '/?pay=success');
     await user.click(screen.getByRole('button', { name: 'Повторить оплату' }));
     expect(
       await screen.findByRole('heading', { name: 'Мои заказы' })

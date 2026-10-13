@@ -216,13 +216,21 @@ export function createOrder({ sessionId, seatIds = [], standing = [], userId }) 
 
 // Исход тестового платёжного шлюза по умолчанию. На бэкенде его задаёт
 // тестовая реализация PaymentGateway (requirements.md §4), в моке — параметр
-// адреса: /checkout/…?pay=decline показывает отказ без правки кода.
+// адреса: ?pay=decline на любой странице включает отказ до конца жизни
+// вкладки, ?pay=success выключает. Запоминаем, а не читаем адрес только при
+// оплате: заказы мока живут в памяти, и перезагрузка оформления с
+// параметром потеряла бы саму бронь.
+let gatewayMode = 'success';
+
 function gatewayOutcome() {
-  if (typeof window === 'undefined') return 'success';
-  return new URLSearchParams(window.location.search).get('pay') === 'decline'
-    ? 'fail'
-    : 'success';
+  if (typeof window !== 'undefined') {
+    const param = new URLSearchParams(window.location.search).get('pay');
+    if (param === 'decline' || param === 'success') gatewayMode = param;
+  }
+  return gatewayMode === 'decline' ? 'fail' : 'success';
 }
+
+if (typeof window !== 'undefined') gatewayOutcome();
 
 // Мок POST /orders/{id}/pay (US-14, US-16, BR-05). `outcome` эмулирует
 // PaymentGateway из requirements.md — управляемый исход, а не случайность,
