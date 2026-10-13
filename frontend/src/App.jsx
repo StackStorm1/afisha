@@ -1,11 +1,19 @@
-import { Routes, Route, useParams } from 'react-router-dom';
+import { Navigate, Routes, Route, useParams } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop.jsx';
 import HomePage from './pages/HomePage.jsx';
 import EventPage from './pages/EventPage.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import FavoritesPage from './pages/FavoritesPage.jsx';
+import SeatsPage from './pages/SeatsPage.jsx';
+import CheckoutPage from './pages/CheckoutPage.jsx';
 import RequireAuth from './components/RequireAuth.jsx';
+import RequireAdmin from './components/RequireAdmin.jsx';
+import AdminLayout from './pages/admin/AdminLayout.jsx';
+import AdminEventsPage from './pages/admin/AdminEventsPage.jsx';
+import AdminVenuesPage from './pages/admin/AdminVenuesPage.jsx';
+import LayoutEditorPage from './pages/admin/LayoutEditorPage.jsx';
+import SessionHallPage from './pages/admin/SessionHallPage.jsx';
 
 // key={eventId}: без него React Router переиспользует тот же экземпляр
 // EventPage при переходе между двумя событиями (например, по клику на
@@ -17,6 +25,13 @@ function EventPageRoute() {
   return <EventPage key={eventId} />;
 }
 
+// key={sessionId}: смена сеанса в выпадающем списке — новая схема, и
+// подсветка зоны со старой схемы на неё не переносится.
+function SeatsPageRoute() {
+  const { sessionId } = useParams();
+  return <SeatsPage key={sessionId} />;
+}
+
 export default function App() {
   return (
     <>
@@ -24,6 +39,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/events/:eventId" element={<EventPageRoute />} />
+        <Route
+          path="/events/:eventId/sessions/:sessionId/seats"
+          element={<SeatsPageRoute />}
+        />
         <Route path="/login" element={<AuthPage key="login" mode="login" />} />
         <Route path="/register" element={<AuthPage key="register" mode="register" />} />
         <Route
@@ -40,6 +59,35 @@ export default function App() {
             <RequireAuth reason="orders">
               <OrdersPage />
             </RequireAuth>
+          }
+        />
+        <Route
+          path="/checkout/:orderId"
+          element={
+            <RequireAuth reason="checkout">
+              <CheckoutPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminLayout />
+            </RequireAdmin>
+          }
+        >
+          <Route index element={<Navigate to="events" replace />} />
+          <Route path="events" element={<AdminEventsPage />} />
+          <Route path="events/sessions/:sessionId/hall" element={<SessionHallPage />} />
+          <Route path="venues" element={<AdminVenuesPage />} />
+        </Route>
+        <Route
+          path="/admin/layouts/:layoutId"
+          element={
+            <RequireAdmin>
+              <LayoutEditorPage />
+            </RequireAdmin>
           }
         />
       </Routes>

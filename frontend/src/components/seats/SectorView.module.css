@@ -1,0 +1,200 @@
+.view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 4px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.back {
+  flex: none;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.back:hover {
+  background: var(--color-surface-hover);
+}
+
+.titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.zones {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+  white-space: pre-wrap;
+}
+
+.zoom {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom button {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.zoom button:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.zoomValue {
+  min-width: 44px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+.scroll {
+  overflow: auto;
+  padding: 16px 8px 8px;
+}
+
+.stage {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  padding-bottom: 14px;
+}
+
+.rows {
+  width: max-content;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.rowLabel {
+  width: calc(var(--pitch) * 1.2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  text-align: right;
+  padding-right: 8px;
+}
+
+.seat {
+  width: var(--pitch);
+  height: var(--pitch);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Видимое место — квадрат внутри шага, кнопка — весь шаг. */
+.seat::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--pitch) * 0.12);
+  border-radius: calc(var(--pitch) * 0.18);
+  background: var(--seat, transparent);
+}
+
+.seat span {
+  position: relative;
+  font-size: calc(var(--pitch) * 0.45);
+  line-height: 1;
+}
+
+.seat[data-state='taken']::before {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.seat[data-state='taken'] {
+  cursor: default;
+}
+
+.seat[data-state='taken'] span {
+  color: var(--color-ink-weak);
+}
+
+.seat[data-state='selected']::before {
+  background: var(--color-ink);
+}
+
+.seat[data-state='selected'] span {
+  color: var(--color-bg);
+}
+
+.seat[data-lost='true']::before {
+  border: 2px solid var(--color-status-error);
+}
+
+.seat:not(:disabled):hover::before {
+  outline: 1px solid var(--color-ink);
+}
+
+.seat:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: -2px;
+}
+
+@media (max-width: 720px) {
+  .bar {
+    flex-wrap: wrap;
+  }
+
+  .titles {
+    order: 3;
+    flex-basis: 100%;
+  }
+}

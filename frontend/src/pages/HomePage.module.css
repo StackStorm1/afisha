@@ -1,7 +1,7 @@
 .main {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 0 40px 120px;
+  padding: 0 var(--grid-gutter) 120px;
 }
 
 .feedSection {

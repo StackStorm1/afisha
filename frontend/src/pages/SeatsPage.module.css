@@ -1,0 +1,424 @@
+.main {
+  max-width: var(--grid-max-width);
+  margin: 0 auto;
+  padding: 0 var(--grid-gutter) 80px;
+}
+
+.message {
+  padding: 80px 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.head {
+  padding: 24px 0 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.back {
+  align-self: flex-start;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+.back:hover {
+  color: var(--color-ink);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+}
+
+/* Выбор сеанса — нативный select под видом кнопки макета. */
+.sessionSelect {
+  position: relative;
+  flex: none;
+}
+
+.sessionSelect select {
+  appearance: none;
+  height: 44px;
+  padding: 0 36px 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sessionSelect select:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: 2px;
+}
+
+.caret {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--color-ink-muted);
+  pointer-events: none;
+}
+
+.legend {
+  padding-bottom: 16px;
+  display: flex;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.zones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.zoneChip {
+  height: 40px;
+  padding: 0 16px 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-family: var(--font-interface);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  transition: opacity 0.14s;
+}
+
+/* Чип 40px по макету, зона нажатия — 44. */
+.zoneChip::after {
+  content: '';
+  position: absolute;
+  inset: -2px 0;
+}
+
+.zoneChip:hover,
+.zoneChip[aria-pressed='true'] {
+  background: var(--color-surface-hover);
+}
+
+.zoneChip[aria-pressed='true'] {
+  border-color: var(--color-ink);
+}
+
+.zoneChip[data-faded='true'] {
+  opacity: 0.45;
+}
+
+.zoneDot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+}
+
+.zonePrice {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.zoneLeft {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-ink-muted);
+}
+
+.zoneLeft[data-sold='true'] {
+  color: var(--color-status-error);
+}
+
+.states {
+  margin-left: auto;
+  display: flex;
+  gap: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-secondary);
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sample {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+}
+
+.sample[data-state='free'] {
+  background: #6c68ee;
+}
+
+.sample[data-state='taken'] {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--color-ink-muted);
+}
+
+.sample[data-state='selected'] {
+  background: var(--color-ink);
+  color: var(--color-bg);
+}
+
+.canvas {
+  position: relative;
+  border: 1px solid var(--color-border);
+  background-color: #0f0f16;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.06) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+  padding: 12px;
+}
+
+.sectionList {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding: 0 var(--grid-gutter) 48px;
+  }
+
+  .head {
+    padding-top: 16px;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .states {
+    display: none;
+  }
+
+  /* Чипы зон — одной строкой с прокруткой, без остатка: остаток есть в
+     списке секторов. */
+  .legend,
+  .zones {
+    flex-wrap: nowrap;
+  }
+
+  .zones {
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px 0;
+  }
+
+  .zoneChip {
+    flex: none;
+  }
+
+  .zoneLeft {
+    display: none;
+  }
+
+  .canvas {
+    padding: 4px;
+  }
+
+  .sectionList {
+    display: block;
+    padding-top: 20px;
+  }
+
+  .sectionList ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.sectionListTitle {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.sectionRow {
+  width: 100%;
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+  min-height: 56px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sectionName {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sectionSub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
+
+.sectionSub[data-sold='true'] {
+  color: var(--color-status-error);
+}
+
+.sectionPrice {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.sectionRow:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.chevron {
+  color: var(--color-ink-muted);
+  font-size: 18px;
+}
+
+.listToggle {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+}
+
+.listToggle::after {
+  content: '';
+  position: absolute;
+  inset: -2px 0;
+}
+
+.listToggle:hover,
+.listToggle[aria-expanded='true'] {
+  background: var(--color-surface-hover);
+}
+
+.booked {
+  margin: 16px 0 0;
+  padding: 14px 18px;
+  border: 1px solid var(--color-border-control);
+  font-size: 14px;
+}
+
+/* Плашка «место заняли» внизу схемы (2c), на телефоне — над нижней
+   панелью (4d). */
+.conflict {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(640px, calc(100% - 32px));
+  padding: 12px 12px 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-status-error);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  z-index: 6;
+  color: var(--color-status-error);
+}
+
+.conflictText {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-ink);
+}
+
+.conflict button {
+  flex: none;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-control);
+  background: transparent;
+  color: var(--color-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.conflict button:hover {
+  background: #23232f;
+}
+
+@media (max-width: 720px) {
+  .conflict {
+    position: fixed;
+    bottom: 140px;
+    z-index: 30;
+  }
+}

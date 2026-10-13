@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -130,7 +130,7 @@ describe('редирект-с-возвратом', () => {
 });
 
 describe('страница события — гость', () => {
-  it('«Войти и купить» ведёт на вход и возвращает к сеансам этого события', async () => {
+  it('«Войти» в баннере гостя ведёт на вход и возвращает к сеансам этого события', async () => {
     const event = listEvents({ per_page: 1 }).data[0];
     const user = userEvent.setup();
     render(
@@ -139,7 +139,10 @@ describe('страница события — гость', () => {
       </MemoryRouter>
     );
 
-    await user.click(screen.getByRole('link', { name: 'Войти и купить' }));
+    const banner = screen.getByText(
+      /Схему зала можно посмотреть без входа/
+    ).parentElement;
+    await user.click(within(banner).getByRole('link', { name: 'Войти' }));
     expect(screen.getByText('Войдите, чтобы выбрать места')).toBeInTheDocument();
 
     await logIn(user);

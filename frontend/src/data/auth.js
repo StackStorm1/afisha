@@ -47,9 +47,23 @@ export const DEMO_USER = {
   created_at: '2026-09-01T09:00:00Z',
 };
 
+// Демо-администратор: регистрация выдаёт только роль visitor (в контракте
+// нет ручки назначения роли), а без админа в моке закрытую часть сайта
+// нечем открыть.
+export const DEMO_ADMIN = {
+  id: 'd3e00000-0000-4000-8000-000000000002',
+  email: 'admin@stack-afisha.ru',
+  password: 'admin12345',
+  role: 'admin',
+  created_at: '2026-09-01T09:00:00Z',
+};
+
+const DEMO_ACCOUNTS = [DEMO_USER, DEMO_ADMIN];
+
 function loadUsers() {
   const users = readJson(USERS_KEY, []);
-  return users.some((u) => u.id === DEMO_USER.id) ? users : [DEMO_USER, ...users];
+  const missing = DEMO_ACCOUNTS.filter((demo) => !users.some((u) => u.id === demo.id));
+  return [...missing, ...users];
 }
 
 function toProfile(user) {

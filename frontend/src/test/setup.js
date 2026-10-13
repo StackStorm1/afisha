@@ -19,3 +19,15 @@ if (!HTMLDialogElement.prototype.showModal) {
     this.dispatchEvent(new Event('close'));
   };
 }
+
+// jsdom не знает PointerEvent: pointermove приходит без pointerType, и
+// подсказку схемы, которая показывается только для мыши, не проверить.
+if (!window.PointerEvent) {
+  class PointerEvent extends MouseEvent {
+    constructor(type, init = {}) {
+      super(type, init);
+      this.pointerType = init.pointerType ?? '';
+    }
+  }
+  window.PointerEvent = PointerEvent;
+}

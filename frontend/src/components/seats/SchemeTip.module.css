@@ -1,0 +1,80 @@
+/* Светлая плашка поверх тёмной схемы — как во всплывающей подсказке зоны в
+   макете схемы зала. */
+.tip {
+  position: absolute;
+  z-index: 5;
+  width: 240px;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 10px));
+}
+
+.tip[data-below='true'] {
+  transform: translate(-50%, 10px);
+}
+
+.body {
+  background: var(--color-ink);
+  color: var(--color-bg);
+  border-radius: var(--radius-control);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Хвостик к элементу; сдвигается, если плашку прижало к краю схемы. */
+.tip::after {
+  content: '';
+  position: absolute;
+  left: calc(50% + var(--arrow, 0px) - 8px);
+  top: 100%;
+  border: 8px solid transparent;
+  border-top-color: var(--color-ink);
+  border-bottom: 0;
+}
+
+.tip[data-below='true']::after {
+  top: auto;
+  bottom: 100%;
+  border: 8px solid transparent;
+  border-bottom-color: var(--color-ink);
+  border-top: 0;
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.price {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.sub {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-weak);
+}
+
+.hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tip {
+    animation: appear 0.12s ease-out;
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}

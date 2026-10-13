@@ -1,18 +1,20 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/useAuth.js';
 import styles from './ProfileMenu.module.css';
 
 // Разделы, куда гостя не пускают: после выхода оставаться на них незачем.
-const PROTECTED_PREFIXES = ['/favorites', '/account'];
+const PROTECTED_PREFIXES = ['/favorites', '/account', '/admin'];
 
 export default function ProfileMenu() {
   const email = useAuth((s) => s.user?.email ?? '');
+  const isAdmin = useAuth((s) => s.user?.role === 'admin');
   const logout = useAuth((s) => s.logout);
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
+  const triggerRef = useRef(null);
   const menuId = useId();
 
   // Переход на другую страницу закрывает меню.
@@ -25,8 +27,11 @@ export default function ProfileMenu() {
     function onPointerDown(e) {
       if (!rootRef.current?.contains(e.target)) setOpen(false);
     }
+    // Esc возвращает фокус на «Профиль», если он был внутри меню.
     function onKeyDown(e) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      if (rootRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+      setOpen(false);
     }
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -47,6 +52,7 @@ export default function ProfileMenu() {
   return (
     <div className={styles.root} ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.trigger}
         data-open={open}
@@ -67,7 +73,7 @@ export default function ProfileMenu() {
           <circle cx="8" cy="5.3" r="2.6" />
           <path d="M3 13.6c0-2.76 2.24-5 5-5s5 2.24 5 5" />
         </svg>
-        Профиль
+        <span className={styles.triggerLabel}>Профиль</span>
       </button>
       {open && (
         <div id={menuId} className={styles.menu}>
@@ -75,6 +81,14 @@ export default function ProfileMenu() {
             <span className={styles.whoLabel}>Вы вошли как</span>
             <span className={styles.email}>{email}</span>
           </div>
+          {isAdmin && (
+            <Link to="/admin" className={styles.item}>
+              <span className={styles.itemGlyph} aria-hidden="true">
+                ⚙
+              </span>
+              Админка
+            </Link>
+          )}
           <button type="button" className={styles.item} onClick={onLogout}>
             <span className={styles.itemGlyph} aria-hidden="true">
               ⇥

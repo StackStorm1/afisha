@@ -1,65 +1,67 @@
 import { uuid } from '../lib/uuid.js';
 import { toMoney } from '../lib/money.js';
+import { generateSeats } from '../lib/hallLayout.js';
 import { listEvents, listEventSessions } from './events.js';
-import { getBalconyStartRow } from './seatMap.js';
+import { getLayout, getSessionHall } from './hallLayouts.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOLD_MINUTES = 15; // BR-02
-const BALCONY_FACTOR = 0.6;
 
 // Заказы демо-аккаунта: все четыре статуса, предстоящие и прошедшие, в том
 // числе на сегодня и завтра, чтобы кабинет показывал все группы. Даты
 // считаются от текущего момента. Прошедших сеансов в каталоге нет, поэтому
-// сеанс внутри заказа собирается здесь же: событие и площадка настоящие,
-// время своё. У балкона row отсчитывается от первого ряда балкона.
+// сеанс внутри заказа собирается здесь же: событие, площадка, схема и цены
+// настоящие, время своё. Места — из первого сидячего сектора схемы, row
+// 'last' — последний ряд (балкон у сидячих залов). standing — билеты на
+// танцпол: такой заказ берёт событие на площадке со стоячей зоной.
 const DEMO_PLAN = [
   {
     day: 0,
     time: [20, 0],
     status: 'paid',
-    seats: { zone: 'stalls', row: 4, from: 5, count: 2 },
+    seats: { row: 4, from: 5, count: 2 },
   },
   {
     day: 1,
     time: [19, 0],
     status: 'failed',
-    seats: { zone: 'balcony', row: 0, from: 11, count: 2 },
+    seats: { row: 'last', from: 11, count: 2 },
   },
   {
     day: 1,
     time: [21, 30],
     status: 'pending',
-    seats: { zone: 'stalls', row: 2, from: 3, count: 1 },
+    seats: { row: 2, from: 3, count: 1 },
   },
   {
     day: 6,
     time: [19, 30],
     status: 'paid',
-    seats: { zone: 'stalls', row: 3, from: 8, count: 3 },
+    standing: 2,
   },
   {
     day: 11,
     time: [20, 0],
     status: 'cancelled',
-    seats: { zone: 'stalls', row: 1, from: 1, count: 2 },
+    seats: { row: 1, from: 1, count: 2 },
   },
   {
     day: -3,
     time: [21, 0],
     status: 'cancelled',
-    seats: { zone: 'stalls', row: 3, from: 7, count: 2 },
+    seats: { row: 3, from: 7, count: 2 },
   },
   {
     day: -12,
     time: [19, 0],
     status: 'paid',
-    seats: { zone: 'balcony', row: 0, from: 7, count: 1 },
+    seats: { row: 'last', from: 7, count: 1 },
   },
   {
     day: -27,
     time: [20, 30],
     status: 'paid',
-    seats: { zone: 'stalls', row: 1, from: 1, count: 2 },
+    seats: { row: 1, from: 1, count: 2 },
   },
 ];
 
@@ -74,17 +76,49 @@ function dayAt(now, dayOffset, [hours, minutes]) {
   return date;
 }
 
-function buildSeats(venue, basePrice, { zone, row, from, count }) {
-  const isBalcony = zone === 'balcony';
-  const rowNo = isBalcony ? getBalconyStartRow(venue.rows_count) + row : row;
-  const price = toMoney(Number(basePrice) * (isBalcony ? BALCONY_FACTOR : 1));
-  return Array.from({ length: count }, (_, i) => ({
+function bookedSeat(section, zone, price, seat) {
+  return {
     id: uuid(),
-    row_no: rowNo,
-    seat_no: from + i,
-    price_category: zone,
+    section: { id: section.id, name: section.name, kind: section.kind },
+    row_label: seat ? seat.row_label : null,
+    seat_label: seat ? seat.seat_label : null,
+    price_zone: { id: zone.id, name: zone.name },
     price,
-  }));
+  };
+}
+
+// BookedSeat по схеме и ценам настоящего сеанса каталога.
+function buildSeats(session, plan) {
+  const hall = getSessionHall(session.id).data;
+  const layout = getLayout(hall.layout_id).data;
+  const priceOf = (zoneId) => hall.prices.find((p) => p.price_zone_id === zoneId).price;
+  const zoneOf = (zoneId) => layout.price_zones.find((z) => z.id === zoneId);
+
+  if (plan.standing) {
+    const section = layout.sections.find((s) => s.kind === 'standing');
+    const zone = zoneOf(section.price_zone_id);
+    return Array.from({ length: plan.standing }, () =>
+      bookedSeat(section, zone, priceOf(zone.id), null)
+    );
+  }
+
+  const section = layout.sections.find((s) => s.kind === 'seated');
+  const seats = generateSeats(section);
+  const rows = [...new Set(seats.map((seat) => seat.row_label))];
+  const { row, from, count } = plan.seats;
+  const rowLabel = row === 'last' ? rows[rows.length - 1] : rows[row - 1];
+  return seats
+    .filter((seat) => seat.row_label === rowLabel)
+    .slice(from - 1, from - 1 + count)
+    .map((seat) => {
+      const zone = zoneOf(seat.price_zone_id);
+      return bookedSeat(section, zone, priceOf(zone.id), seat);
+    });
+}
+
+function hasStanding(session) {
+  const layout = getLayout(getSessionHall(session.id).data.layout_id).data;
+  return layout.sections.some((s) => s.kind === 'standing');
 }
 
 export function buildDemoOrders(now = new Date()) {
@@ -99,9 +133,12 @@ export function buildDemoOrders(now = new Date()) {
     // у демо-аккаунта пропадали бы статусы.
     if (plan.day === 0 && startsAt <= now) return;
 
-    const event = events[(index * 7) % events.length];
+    let event = events[(index * 7) % events.length];
+    if (plan.standing) {
+      event = events.find((e) => hasStanding(listEventSessions(e.id)[0])) ?? event;
+    }
     const session = listEventSessions(event.id)[0];
-    const seats = buildSeats(session.venue, session.price, plan.seats);
+    const seats = buildSeats(session, plan);
     const holdsSeats = plan.status === 'pending' || plan.status === 'failed';
     // Бронь с удержанием создана только что: удержание длится 15 минут.
     const createdAt = holdsSeats
