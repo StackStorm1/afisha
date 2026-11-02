@@ -6,7 +6,7 @@
 .row {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 14px 40px;
+  padding: 14px var(--grid-gutter);
   min-height: 48px;
   display: flex;
   align-items: center;
@@ -52,6 +52,6 @@
 
 @media (max-width: 600px) {
   .row {
-    padding: 12px 16px;
+    padding: 12px var(--grid-gutter);
   }
 }

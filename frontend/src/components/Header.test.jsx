@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import Header from './Header.jsx';
 import { useAuth } from '../store/useAuth.js';
+import { useFiltersStore } from '../store/useFiltersStore.js';
+import { VENUES } from '../data/venues.js';
 
 const VISITOR = {
   status: 'visitor',
@@ -37,6 +39,8 @@ function renderAt(path, { showFilters } = {}) {
 
 beforeEach(() => {
   window.localStorage.clear();
+  useFiltersStore.getState().resetAll();
+  useFiltersStore.setState({ q: '' });
   useAuth.setState({ status: 'guest', token: null, user: null });
 });
 
@@ -77,6 +81,19 @@ describe('Header — состояние авторизации', () => {
 
     await user.keyboard('{Escape}');
     expect(screen.queryByText(VISITOR.user.email)).not.toBeInTheDocument();
+  });
+
+  it('Esc из меню возвращает фокус на «Профиль»', async () => {
+    useAuth.setState(VISITOR);
+    const user = userEvent.setup();
+    renderAt('/events/1');
+    const trigger = screen.getByRole('button', { name: /Профиль/ });
+    await user.click(trigger);
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Выйти' })).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveFocus();
   });
 
   it('клик вне меню закрывает его', async () => {
@@ -134,5 +151,60 @@ describe('Header — варианты', () => {
   it('с showFilters — со строкой фильтров', () => {
     renderAt('/events/1', { showFilters: true });
     expect(screen.getByRole('button', { name: /Ещё фильтры/ })).toBeInTheDocument();
+  });
+});
+
+describe('Header — поиск с клавиатуры', () => {
+  function searchBox() {
+    return screen.getByRole('combobox', { name: 'Поиск по названию или площадке' });
+  }
+
+  it('стрелки ходят по подсказкам по кругу, Enter выбирает площадку', async () => {
+    const user = userEvent.setup();
+    renderAt('/events/1');
+    await user.type(searchBox(), 'театр');
+
+    const options = screen.getAllByRole('option');
+    expect(searchBox()).toHaveAttribute('aria-expanded', 'true');
+    expect(searchBox()).not.toHaveAttribute('aria-activedescendant');
+
+    await user.keyboard('{ArrowDown}');
+    expect(searchBox()).toHaveAttribute('aria-activedescendant', options[0].id);
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(searchBox()).toHaveFocus();
+
+    await user.keyboard('{ArrowUp}');
+    expect(searchBox()).toHaveAttribute('aria-activedescendant', options.at(-1).id);
+    await user.keyboard('{ArrowDown}');
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+
+    await user.keyboard('{Enter}');
+    const theatre = VENUES.find((v) => v.name === 'Большой театр');
+    expect(useFiltersStore.getState().venueId).toBe(theatre.id);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('Esc закрывает подсказки, фокус остаётся в поле', async () => {
+    const user = userEvent.setup();
+    renderAt('/events/1');
+    await user.type(searchBox(), 'театр');
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(searchBox()).toHaveAttribute('aria-expanded', 'false');
+    expect(searchBox()).toHaveFocus();
+    expect(searchBox()).toHaveValue('театр');
+  });
+
+  it('«/» вне полей ввода ставит курсор в поиск', async () => {
+    const user = userEvent.setup();
+    renderAt('/events/1');
+    await user.keyboard('/');
+    expect(searchBox()).toHaveFocus();
+    expect(searchBox()).toHaveValue('');
+
+    await user.keyboard('a/');
+    expect(searchBox()).toHaveValue('a/');
   });
 });

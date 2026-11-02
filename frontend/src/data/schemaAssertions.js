@@ -92,30 +92,64 @@ export function expectSession(session) {
   expect(session.seats_left).toBeLessThanOrEqual(session.total_seats);
 }
 
+// SeatMap и BookedSeat — по спеке сегментной схемы зала (§5.1, §5.3).
 export function expectSeatInfo(seat) {
   expectHasFields(seat, [
     'id',
-    'seat_no',
-    'price_category',
-    'price',
+    'row_label',
+    'seat_label',
+    'x',
+    'y',
+    'price_zone_id',
     'status',
     'held_by_me',
   ]);
   expectUuid(seat.id);
-  expect(['stalls', 'balcony']).toContain(seat.price_category);
-  expectMoney(seat.price);
+  expectUuid(seat.price_zone_id);
+  expect(typeof seat.row_label).toBe('string');
+  expect(typeof seat.seat_label).toBe('string');
   expect(['free', 'held', 'paid']).toContain(seat.status);
   expect(typeof seat.held_by_me).toBe('boolean');
 }
 
 export function expectSeatMap(seatMap) {
-  expectHasFields(seatMap, ['session_id', 'status', 'price', 'rows']);
+  expectHasFields(seatMap, ['session_id', 'status', 'layout', 'price_zones', 'sections']);
   expectUuid(seatMap.session_id);
-  expectMoney(seatMap.price);
-  expect(seatMap.rows.length).toBeGreaterThan(0);
-  for (const row of seatMap.rows) {
-    expectHasFields(row, ['row_no', 'seats']);
-    for (const seat of row.seats) expectSeatInfo(seat);
+  expectHasFields(seatMap.layout, ['id', 'name', 'canvas_width', 'canvas_height']);
+  expect(seatMap.price_zones.length).toBeGreaterThan(0);
+  for (const zone of seatMap.price_zones) {
+    expectHasFields(zone, ['id', 'name', 'sort_order', 'price', 'available']);
+    expectUuid(zone.id);
+    expectMoney(zone.price);
+  }
+  expect(seatMap.sections.length).toBeGreaterThan(0);
+  for (const section of seatMap.sections) {
+    expectHasFields(section, ['id', 'name', 'kind', 'shape']);
+    expect(['seated', 'standing']).toContain(section.kind);
+    if (section.kind === 'seated') {
+      for (const seat of section.seats) expectSeatInfo(seat);
+    } else {
+      expectHasFields(section, ['price_zone_id', 'capacity', 'available', 'held_by_me']);
+      expect(section).not.toHaveProperty('seats');
+    }
+  }
+}
+
+export function expectBookedSeat(seat) {
+  expectHasFields(seat, [
+    'id',
+    'section',
+    'row_label',
+    'seat_label',
+    'price_zone',
+    'price',
+  ]);
+  expectHasFields(seat.section, ['id', 'name', 'kind']);
+  expectHasFields(seat.price_zone, ['id', 'name']);
+  expectMoney(seat.price);
+  if (seat.section.kind === 'standing') {
+    expect(seat.row_label).toBeNull();
+    expect(seat.seat_label).toBeNull();
   }
 }
 
@@ -134,9 +168,7 @@ export function expectOrderDetail(order) {
   expectHasFields(order.session, ['id', 'event', 'venue', 'starts_at', 'price']);
   expectHasFields(order.session.event, ['id', 'title']);
   expectHasFields(order.session.venue, ['name', 'address', 'city']);
-  for (const seat of order.seats) {
-    expectHasFields(seat, ['id', 'row_no', 'seat_no', 'price_category', 'price']);
-  }
+  for (const seat of order.seats) expectBookedSeat(seat);
   expectMoney(order.total_price);
   expect(['pending', 'paid', 'cancelled', 'failed']).toContain(order.status);
   expectTimestamp(order.created_at);

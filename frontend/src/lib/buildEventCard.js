@@ -29,6 +29,7 @@ export function buildEventCard(event, session) {
     when: formatSessionWhen(session.starts_at),
     startsAt: session.starts_at,
     venue: session.venue,
+    capacity: session.total_seats,
     ...badge,
   };
 }

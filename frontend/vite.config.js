@@ -12,5 +12,8 @@ export default defineConfig({
     globals: true,
     setupFiles: './src/test/setup.js',
     css: false,
+    // Тесты страниц рендерят всё приложение, у схемы зала — сотни мест:
+    // под нагрузкой параллельного прогона 5 секунд по умолчанию не хватает.
+    testTimeout: 15000,
   },
 });

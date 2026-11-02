@@ -1,7 +1,7 @@
 .main {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 0 40px 120px;
+  padding: 0 var(--grid-gutter) 120px;
 }
 
 .breadcrumb {
@@ -70,15 +70,34 @@
   height: 32px;
   padding: 0 14px;
   border-radius: var(--radius-pill);
-  background: rgba(240, 176, 96, 0.16);
-  border: 1px solid rgba(240, 176, 96, 0.5);
-  color: var(--color-status-warning);
+  --badge-color: var(--color-ink-secondary);
+  background: color-mix(in srgb, var(--badge-color) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-color) 50%, transparent);
+  color: var(--badge-color);
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   display: inline-flex;
   align-items: center;
+}
+
+/* Цвет — категории события. В макете показан театр, отсюда был
+   постоянный оранжевый у любой категории. */
+.categoryBadge[data-category='concert'] {
+  --badge-color: var(--color-cat-concert);
+}
+
+.categoryBadge[data-category='theatre'] {
+  --badge-color: var(--color-cat-theatre);
+}
+
+.categoryBadge[data-category='standup'] {
+  --badge-color: var(--color-cat-standup);
+}
+
+.categoryBadge[data-category='festival'] {
+  --badge-color: var(--color-cat-festival);
 }
 
 .plainBadge {
@@ -111,6 +130,30 @@
   color: #d6d2e0;
 }
 
+/* Обложка 16:9 на узком экране ниже заголовка с метой — без этого
+   название обрезалось сверху. На телефоне высота по содержимому. */
+@media (max-width: 900px) {
+  .heroTitle {
+    font-size: 44px;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero {
+    aspect-ratio: auto;
+    min-height: 360px;
+    padding: 20px;
+  }
+
+  .heroTitle {
+    font-size: 32px;
+  }
+
+  .heroMeta {
+    font-size: 13px;
+  }
+}
+
 .sessionsSection {
   padding: 40px 0 0;
   display: grid;
@@ -120,8 +163,7 @@
 }
 
 @media (max-width: 900px) {
-  .sessionsSection,
-  .infoSection {
+  .sessionsSection {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -515,6 +557,14 @@
   grid-template-columns: minmax(0, 1.62fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
+}
+
+/* Медиазапрос — после базового правила: выше по файлу он им перебивался,
+   и на телефоне описание и карточка площадки шли в две узкие колонки. */
+@media (max-width: 900px) {
+  .infoSection {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .description {

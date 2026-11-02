@@ -1,6 +1,12 @@
 import { getEvent } from '../data/events.js';
 import { addDaysIso, toDateOnly } from './dateStrip.js';
-import { formatMonthShort, formatPrice, formatSessionWhen, pluralize } from './format.js';
+import {
+  formatMonthShort,
+  formatPrice,
+  formatSessionWhen,
+  listNames,
+  pluralize,
+} from './format.js';
 
 const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
@@ -10,8 +16,6 @@ export const ORDER_STATUS = {
   failed: { glyph: '✕', label: 'Ошибка оплаты' },
   cancelled: { glyph: '—', label: 'Отменён' },
 };
-
-const ZONE_NAMES = { stalls: 'Партер', balcony: 'Балкон' };
 
 // Вкладку определяет только время сеанса, статус не влияет: отменённый
 // заказ на завтрашний сеанс остаётся в «Предстоящих». Предстоящие — от
@@ -35,6 +39,55 @@ export function isCancellable(order, now = new Date()) {
     (order.status === 'paid' || order.status === 'pending') &&
     new Date(order.session.starts_at) > now
   );
+}
+
+// Бронь ещё можно оплатить: ждёт оплаты или оплата не прошла (US-16), и
+// время удержания не вышло. Фоновая задача отменяет такие заказы раз в
+// минуту, поэтому по часам проверяем сами.
+export function isPayable(order, now = new Date()) {
+  return (
+    (order.status === 'pending' || order.status === 'failed') &&
+    order.expires_at != null &&
+    new Date(order.expires_at) > now
+  );
+}
+
+// Строки билетов для оформления: место — строкой, стоячая зона — одной
+// строкой с количеством и суммой. Порядок — как в заказе.
+export function ticketLines(seats) {
+  const lines = [];
+  const standing = new Map();
+  for (const seat of seats) {
+    if (seat.section.kind === 'standing') {
+      const line = standing.get(seat.section.id);
+      if (line) {
+        line.count += 1;
+        line.amount += Number(seat.price);
+        continue;
+      }
+      // У зоны и сектора часто одно имя («Танцпол») — не повторяем.
+      const zone =
+        seat.price_zone.name === seat.section.name ? null : seat.price_zone.name;
+      const created = {
+        key: seat.section.id,
+        title: seat.section.name,
+        zone,
+        count: 1,
+        amount: Number(seat.price),
+      };
+      standing.set(seat.section.id, created);
+      lines.push(created);
+    } else {
+      lines.push({
+        key: seat.id,
+        title: `${seat.section.name} · Ряд ${seat.row_label}, место ${seat.seat_label}`,
+        zone: seat.price_zone.name,
+        count: 1,
+        amount: Number(seat.price),
+      });
+    }
+  }
+  return lines.map(({ amount, ...line }) => ({ ...line, price: formatPrice(amount) }));
 }
 
 // «пн, 14 сен»
@@ -64,37 +117,57 @@ export function groupUpcoming(upcoming, now = new Date()) {
   return groups.filter((group) => group.orders.length > 0);
 }
 
-// «Ряд 4, места 5–6», «Ряд 2, место 3». Места одного ряда сливаются в
-// диапазоны, ряды разделены точкой с запятой.
-export function formatSeats(seats) {
-  const byRow = new Map();
-  for (const seat of seats) {
-    if (!byRow.has(seat.row_no)) byRow.set(seat.row_no, []);
-    byRow.get(seat.row_no).push(seat.seat_no);
+// Номера подряд сливаются в диапазоны: «5–6», «3», «1–2, 7».
+function joinRanges(labels) {
+  const numbers = labels.map(Number);
+  if (numbers.some((n) => !Number.isInteger(n))) return labels.join(', ');
+  numbers.sort((a, b) => a - b);
+  const ranges = [];
+  for (const n of numbers) {
+    const last = ranges[ranges.length - 1];
+    if (last && n === last[1] + 1) last[1] = n;
+    else ranges.push([n, n]);
   }
-  return [...byRow.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([rowNo, numbers]) => {
-      numbers.sort((a, b) => a - b);
-      const ranges = [];
-      for (const n of numbers) {
-        const last = ranges[ranges.length - 1];
-        if (last && n === last[1] + 1) last[1] = n;
-        else ranges.push([n, n]);
-      }
-      const text = ranges.map(([from, to]) =>
-        from === to ? `${from}` : `${from}–${to}`
-      );
-      const word = numbers.length === 1 ? 'место' : 'места';
-      return `Ряд ${rowNo}, ${word} ${text.join(', ')}`;
-    })
-    .join('; ');
+  return ranges
+    .map(([from, to]) => (from === to ? `${from}` : `${from}–${to}`))
+    .join(', ');
 }
 
+// Места заказа по секторам: «Сектор B · Ряд 4, места 11–12», у стоячей
+// зоны — «Танцпол × 2». Ряды одного сектора — через точку с запятой,
+// сектора — через « · ». Порядок — как в заказе.
+export function formatSeats(seats) {
+  const sections = new Map();
+  for (const seat of seats) {
+    const entry = sections.get(seat.section.id) ?? {
+      section: seat.section,
+      rows: new Map(),
+      count: 0,
+    };
+    entry.count += 1;
+    if (seat.row_label != null) {
+      if (!entry.rows.has(seat.row_label)) entry.rows.set(seat.row_label, []);
+      entry.rows.get(seat.row_label).push(seat.seat_label);
+    }
+    sections.set(seat.section.id, entry);
+  }
+  return [...sections.values()]
+    .map(({ section, rows, count }) => {
+      if (section.kind === 'standing') return `${section.name} × ${count}`;
+      const text = [...rows.entries()]
+        .map(([row, labels]) => {
+          const word = labels.length === 1 ? 'место' : 'места';
+          return `Ряд ${row}, ${word} ${joinRanges(labels)}`;
+        })
+        .join('; ');
+      return `${section.name} · ${text}`;
+    })
+    .join(' · ');
+}
+
+// Ценовые зоны заказа по порядку появления: «Партер», «Партер и балкон».
 export function formatZones(seats) {
-  const zones = new Set(seats.map((seat) => seat.price_category));
-  if (zones.size > 1) return 'Партер и балкон';
-  return ZONE_NAMES[[...zones][0]] ?? '';
+  return listNames([...new Set(seats.map((seat) => seat.price_zone.name))]);
 }
 
 // В контракте id заказа — uuid, короткого номера нет. Для человека

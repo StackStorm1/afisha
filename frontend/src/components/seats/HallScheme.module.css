@@ -1,0 +1,163 @@
+.wrap {
+  position: relative;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Шире — места не крупнее, а подписи уже великоваты: ~1,5 к холсту. */
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+/* Сцена — сплошная фиолетовая плашка, отличается от секторов формой и
+   заливкой. */
+.stage path {
+  fill: var(--color-accent);
+}
+
+.stage text {
+  fill: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+}
+
+.section {
+  transition: opacity 0.14s;
+}
+
+.section[data-opens='true'],
+.seat[data-seat-id] {
+  cursor: pointer;
+}
+
+.section[data-opens='true']:hover .block,
+.section[data-open='true'] .block {
+  stroke: var(--color-ink);
+}
+
+.section[data-open='true'] .block {
+  stroke-width: 2;
+}
+
+.seat[data-seat-id]:hover rect {
+  stroke: var(--color-ink);
+  stroke-width: 0.8;
+}
+
+.section[data-dimmed='true'] {
+  opacity: 0.3;
+}
+
+.block {
+  fill: var(--color-surface);
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 1;
+}
+
+/* Стоячая зона тонирована цветом своей ценовой зоны. */
+.section[data-kind='standing'] .block {
+  fill-opacity: 0.33;
+}
+
+.section[data-sold='true'] .block {
+  fill-opacity: 1;
+}
+
+.hatchBase {
+  fill: #16161e;
+}
+
+.hatchLine {
+  fill: #1e1e28;
+}
+
+.name {
+  fill: var(--color-ink);
+  font-family: var(--font-interface);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.sub {
+  fill: var(--color-ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 7px;
+}
+
+.sub[data-sold='true'] {
+  fill: var(--color-status-error);
+}
+
+.center {
+  fill: var(--color-ink);
+  font-family: var(--font-interface);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+/* Три состояния места различаются не только цветом: свободное залито
+   цветом зоны, занятое — контур с крестиком, выбранное — белое с галочкой. */
+.seat rect {
+  fill-opacity: 1;
+}
+
+.seat[data-state='taken'] rect {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 0.6;
+}
+
+.seat[data-state='selected'] rect {
+  fill: var(--color-ink);
+}
+
+.seat[data-lost='true'] rect {
+  stroke: var(--color-status-error);
+  stroke-width: 1.6;
+}
+
+.seat[data-dimmed='true'] {
+  opacity: 0.2;
+}
+
+.cross,
+.check {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cross {
+  stroke: var(--color-ink-weak);
+}
+
+.check {
+  stroke: var(--color-bg);
+}
+
+.rowLabel {
+  fill: var(--color-ink-muted);
+  font-family: var(--font-mono);
+}
+
+/* На телефоне схема — мини-карта над списком секторов: без мест и
+   мелких подписей, только блоки и крупные названия. */
+@media (max-width: 720px) {
+  .seats,
+  .sub,
+  .center {
+    display: none;
+  }
+
+  .name {
+    font-size: 24px;
+  }
+
+  .stage text {
+    font-size: 20px;
+    letter-spacing: 0.12em;
+  }
+}

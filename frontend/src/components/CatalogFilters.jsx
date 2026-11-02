@@ -39,7 +39,7 @@ export default function CatalogFilters() {
           <button
             key={option.key}
             type="button"
-            className={styles.chip}
+            className={`${styles.chip} u-hit`}
             data-active={time === option.key}
             onClick={() => toggleTime(option.key)}
           >
@@ -56,7 +56,7 @@ export default function CatalogFilters() {
           <button
             key={cat.code}
             type="button"
-            className={styles.chip}
+            className={`${styles.chip} u-hit`}
             data-active={category === cat.code}
             onClick={() => toggleCategory(cat.code)}
           >
@@ -70,7 +70,7 @@ export default function CatalogFilters() {
 
         <button
           type="button"
-          className={styles.moreButton}
+          className={`${styles.moreButton} u-hit`}
           data-open={moreOpen}
           aria-expanded={moreOpen}
           onClick={toggleMore}
@@ -115,7 +115,7 @@ export default function CatalogFilters() {
                 <button
                   key={option}
                   type="button"
-                  className={styles.chip}
+                  className={`${styles.chip} u-hit`}
                   data-active={age === option}
                   onClick={() => toggleAge(option)}
                 >
@@ -130,7 +130,7 @@ export default function CatalogFilters() {
                 <button
                   key={option.key}
                   type="button"
-                  className={styles.chip}
+                  className={`${styles.chip} u-hit`}
                   data-active={sort === option.key}
                   aria-pressed={sort === option.key}
                   onClick={() => setSort(option.key)}
@@ -144,7 +144,7 @@ export default function CatalogFilters() {
               <span className={styles.morePanelLabel}>Наличие</span>
               <button
                 type="button"
-                className={styles.chip}
+                className={`${styles.chip} u-hit`}
                 data-active={onlyAvailable}
                 aria-pressed={onlyAvailable}
                 onClick={toggleOnlyAvailable}

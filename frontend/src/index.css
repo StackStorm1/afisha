@@ -1,3 +1,34 @@
+/* Кириллица для афишного голоса. Archivo Black — одно начертание веса 400,
+   и заголовки стоят на 400; Inter того же веса рядом с ним выглядит
+   тонким. Поэтому начертание Inter Black (900) объявлено под своим именем
+   с весом 400 — оно подменяет только Archivo Black. */
+@font-face {
+  font-family: 'Afisha Display Cyrillic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/inter/files/inter-cyrillic-900-normal.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Afisha Display Cyrillic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/inter/files/inter-cyrillic-ext-900-normal.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: 'Afisha Display Cyrillic';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('@fontsource/inter/files/inter-latin-ext-900-normal.woff2') format('woff2');
+  unicode-range: U+20BD;
+}
+
 :root {
   /* Поверхности */
   --color-bg: #0b0b11;
@@ -38,12 +69,21 @@
   --grid-gutter: 40px;
   --grid-gap: 24px;
 
-  /* Типографика */
-  --font-display: 'Archivo Black', sans-serif;
-  --font-interface: 'Archivo', system-ui, sans-serif;
+  /* Типографика. У Archivo и Archivo Black нет кириллицы, русские буквы
+     берутся из Inter: латиница и цифры остаются в Archivo. */
+  --font-display: 'Archivo Black', 'Afisha Display Cyrillic', sans-serif;
+  --font-interface: 'Archivo', 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   color-scheme: dark;
+}
+
+/* Поле страницы на телефоне. Макеты только десктопные (1440, поля 40px),
+   16px — общее значение для всех экранов вместо прежних 40/20/16. */
+@media (max-width: 600px) {
+  :root {
+    --grid-gutter: 16px;
+  }
 }
 
 * {
@@ -107,6 +147,23 @@ input {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-ink-secondary);
+}
+
+/* Область нажатия не меньше 44×44 при меньшем видимом элементе: чипы 36px,
+   текстовые ссылки. Невидимый слой по центру добирает недостающее, вид и
+   раскладка не меняются. */
+.u-hit {
+  position: relative;
+}
+
+.u-hit::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5,7 +5,7 @@
 .inner {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 32px 40px;
+  padding: 32px var(--grid-gutter);
   display: flex;
   align-items: center;
   justify-content: space-between;

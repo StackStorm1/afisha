@@ -4,24 +4,34 @@ import Header from '../components/Header.jsx';
 import Footer from '../components/Footer.jsx';
 import PosterImage from '../components/PosterImage.jsx';
 import { getEvent } from '../data/events.js';
-import { getBalconyStartRow } from '../data/seatMap.js';
+import { getSeatMap } from '../data/seatMap.js';
 import { useEventDateStrip } from '../lib/useEventSessions.js';
 import { buildSessionRowView } from '../lib/sessionRowView.js';
-import { getSessionZones, ZONE_LABELS } from '../lib/cardBadge.js';
+import { getSessionZones, listZoneNames } from '../lib/cardBadge.js';
 import { useFavoriteToggle } from '../lib/useFavoriteToggle.js';
 import { useAuth } from '../store/useAuth.js';
 import { loginState } from '../lib/loginRedirect.js';
 import {
+  formatCount,
   formatDuration,
   formatPrice,
   formatSessionWhen,
-  pluralizeRows,
-  pluralizeSeats,
+  pluralWord,
   pluralizeSessions,
 } from '../lib/format.js';
 import styles from './EventPage.module.css';
 
 const DESCRIPTION_CLAMP_THRESHOLD = 180;
+
+// «Зал «Танцпол + трибуны»: 2 648 мест, из них 1 800 стоячих.»
+function describeHall(seatMap, total) {
+  const standing = seatMap.sections
+    .filter((section) => section.kind === 'standing')
+    .reduce((sum, section) => sum + section.capacity, 0);
+  const seats = `${formatCount(total)} ${pluralWord(total, 'место', 'места', 'мест')}`;
+  const tail = standing > 0 ? `, из них ${formatCount(standing)} стоячих` : '';
+  return `Зал «${seatMap.layout.name}»: ${seats}${tail}.`;
+}
 
 function nextOpenSession(activeSessions) {
   return (
@@ -62,8 +72,7 @@ export default function EventPage() {
     );
   }
 
-  // Схемы зала ещё нет, поэтому после входа ведём к списку сеансов этого
-  // события, а не на несуществующую страницу выбора мест.
+  // Вход из баннера гостя возвращает к списку сеансов этого события.
   const seatsLoginState = loginState(
     { pathname: location.pathname, search: location.search, hash: '#sessions' },
     'seats'
@@ -71,7 +80,7 @@ export default function EventPage() {
 
   const activeSessions = allSessions.filter((s) => s.status === 'active');
   const next = nextOpenSession(activeSessions);
-  const nextView = next ? buildSessionRowView(next, { authorized }) : null;
+  const nextView = next ? buildSessionRowView(next) : null;
 
   const openPrices = activeSessions
     .map((s) => {
@@ -83,12 +92,12 @@ export default function EventPage() {
     openPrices.length > 0 ? `от ${formatPrice(Math.min(...openPrices))}` : 'Продано';
 
   const venue = next?.venue ?? allSessions[0]?.venue ?? null;
-  const balconyStartRow = venue ? getBalconyStartRow(venue.rows_count) : null;
-  const priceCategories = venue
-    ? [...new Set(allSessions.flatMap((s) => getSessionZones(s).map((z) => z.category)))]
-        .map((code) => ZONE_LABELS[code])
-        .join(', ')
-    : '—';
+  // Схема зала ближайшего сеанса: у сеансов одной площадки она может быть
+  // разной (танцпол или сидячий партер), описываем ту, что продаётся первой.
+  const hallSession = next ?? allSessions[0] ?? null;
+  const seatMap = hallSession ? getSeatMap(hallSession.id) : null;
+  const priceCategories = seatMap ? listZoneNames(seatMap.price_zones) : '—';
+  const hallLabel = seatMap ? describeHall(seatMap, hallSession.total_seats) : null;
 
   const dates = activeSessions.map((s) => s.starts_at.slice(0, 10)).sort();
   const sessionCountLabel =
@@ -104,13 +113,13 @@ export default function EventPage() {
       <Header />
       <main className={styles.main}>
         <nav className={styles.breadcrumb} aria-label="Хлебные крошки">
-          <Link to="/" className={styles.breadcrumbLink}>
+          <Link to="/" className={`${styles.breadcrumbLink} u-hit`}>
             Главная
           </Link>
           <span className={styles.breadcrumbSep}>/</span>
           <Link
             to={`/?category=${event.category.slug}`}
-            className={styles.breadcrumbLink}
+            className={`${styles.breadcrumbLink} u-hit`}
           >
             {event.category.name}
           </Link>
@@ -123,7 +132,9 @@ export default function EventPage() {
           <div className={styles.heroGradient} />
           <div className={styles.heroContent}>
             <div className={styles.heroBadges}>
-              <span className={styles.categoryBadge}>{event.category.name}</span>
+              <span className={styles.categoryBadge} data-category={event.category.code}>
+                {event.category.name}
+              </span>
               <span className={styles.plainBadge}>{event.age_rating}</span>
               <span className={styles.plainBadge}>
                 {formatDuration(event.duration_minutes)}
@@ -176,7 +187,7 @@ export default function EventPage() {
 
             <div className={styles.sessionList}>
               {daySessions.map((session) => {
-                const view = buildSessionRowView(session, { authorized });
+                const view = buildSessionRowView(session);
                 return (
                   <div key={session.id} className={styles.sessionRow}>
                     <div className={styles.sessionTime}>
@@ -202,11 +213,8 @@ export default function EventPage() {
                         to={
                           view.sold
                             ? '#'
-                            : authorized
-                              ? `/events/${event.id}/sessions/${session.id}/seats`
-                              : '/login'
+                            : `/events/${event.id}/sessions/${session.id}/seats`
                         }
-                        state={!view.sold && !authorized ? seatsLoginState : undefined}
                         className={styles.sessionButton}
                         data-disabled={view.sold}
                         aria-disabled={view.sold}
@@ -264,15 +272,10 @@ export default function EventPage() {
                 </span>
               </div>
               <div className={styles.asideActions}>
-                {authorized ? (
-                  <a href="#sessions" className={styles.asideCta}>
-                    Выбрать места
-                  </a>
-                ) : (
-                  <Link to="/login" state={seatsLoginState} className={styles.asideCta}>
-                    Войти и купить
-                  </Link>
-                )}
+                {/* Схему зала гость смотрит без входа, поэтому и ему — к сеансам. */}
+                <a href="#sessions" className={styles.asideCta}>
+                  Выбрать места
+                </a>
                 <button
                   type="button"
                   className={styles.asideFavorite}
@@ -344,13 +347,11 @@ export default function EventPage() {
                 {venue.address} · {venue.city.name}
               </span>
               <div className={styles.asideDivider} />
-              <span className={styles.venueCardAddress}>
-                Зал: {pluralizeRows(venue.rows_count)} по{' '}
-                {pluralizeSeats(venue.seats_per_row)}. Ряды 1–
-                {balconyStartRow - 1} — партер, {balconyStartRow}–{venue.rows_count} —
-                балкон.
-              </span>
-              <Link to={`/?venue=${venue.id}`} className={styles.venueCardLink}>
+              <span className={styles.venueCardAddress}>{hallLabel}</span>
+              <Link
+                to={`/?venue=${venue.id}`}
+                className={`${styles.venueCardLink} u-hit`}
+              >
                 Все события на этой площадке →
               </Link>
             </div>

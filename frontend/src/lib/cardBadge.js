@@ -1,26 +1,22 @@
 import { getSeatMap } from '../data/seatMap.js';
-import { formatPrice } from './format.js';
+import { formatPrice, listNames } from './format.js';
 
-export const ZONE_LABELS = { stalls: 'Партер', balcony: 'Балкон' };
-
+// Ценовые зоны сеанса с ценой и остатком — из схемы зала, по sort_order.
 export function getSessionZones(session) {
-  return zonesFromSeatMap(getSeatMap(session.id));
+  return getSeatMap(session.id).price_zones.map((zone) => ({
+    id: zone.id,
+    name: zone.name,
+    price: Number(zone.price),
+    available: zone.available,
+  }));
 }
 
-function zonesFromSeatMap(seatMap) {
-  const byCategory = new Map();
-  for (const row of seatMap.rows) {
-    for (const seat of row.seats) {
-      const zone = byCategory.get(seat.price_category) ?? {
-        category: seat.price_category,
-        price: Number(seat.price),
-        available: 0,
-      };
-      if (seat.status === 'free') zone.available += 1;
-      byCategory.set(seat.price_category, zone);
-    }
-  }
-  return Array.from(byCategory.values());
+export function listZoneNames(zones) {
+  return listNames(zones.map((zone) => zone.name));
+}
+
+function soldOutWord(count) {
+  return count > 1 ? 'распроданы' : 'распродан';
 }
 
 // Честные бейджи срочности и цены — конкретные числа остатка вместо
@@ -45,7 +41,7 @@ export function deriveCardBadge(session) {
     badge = `Продано ${soldPct}%`;
     badgeTone = 'warning';
   } else if (availableZones.length === 1 && zones.length > 1) {
-    badge = `Остался ${ZONE_LABELS[availableZones[0].category].toLowerCase()}`;
+    badge = `Только ${availableZones[0].name.toLowerCase()}`;
     badgeTone = 'warning';
   }
 
@@ -56,10 +52,9 @@ export function deriveCardBadge(session) {
     note = 'Все места заняты';
   } else if (availableZones.length < zones.length) {
     const soldOutZones = zones.filter((z) => z.available === 0);
-    const label = soldOutZones.map((z) => ZONE_LABELS[z.category]).join(', ');
-    note = soldOutZones.length > 1 ? `${label} распроданы` : `${label} распродан`;
+    note = `${listZoneNames(soldOutZones)} ${soldOutWord(soldOutZones.length)}`;
   } else {
-    note = zones.length > 1 ? 'Партер и балкон' : 'Единая цена';
+    note = zones.length > 1 ? listZoneNames(zones) : 'Единая цена';
   }
 
   const priceLabel = sold

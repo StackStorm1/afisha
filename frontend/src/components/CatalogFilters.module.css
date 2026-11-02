@@ -5,7 +5,7 @@
 .filterRow {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 12px 40px;
+  padding: 12px var(--grid-gutter);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -72,7 +72,7 @@
 .dateStripWrap {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 0 40px 14px;
+  padding: 0 var(--grid-gutter) 14px;
 }
 
 .dateStrip {
@@ -163,7 +163,7 @@
 .morePanelWrap {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 0 40px 16px;
+  padding: 0 var(--grid-gutter) 16px;
 }
 
 .morePanel {
@@ -199,7 +199,7 @@
   color: var(--color-link);
 }
 
-/* Брейкпоинт и боковой отступ (40px) — как у остальной сетки. */
+/* Брейкпоинт — как у остальной сетки. */
 @media (max-width: 600px) {
   .filterRow {
     gap: 8px;

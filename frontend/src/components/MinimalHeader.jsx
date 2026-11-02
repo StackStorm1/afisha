@@ -7,7 +7,7 @@ export default function MinimalHeader() {
   return (
     <header className={styles.header}>
       <div className={styles.row}>
-        <Link to="/" className={styles.logo}>
+        <Link to="/" className={`${styles.logo} u-hit`}>
           Stack Afisha
         </Link>
         <Link to="/" className={styles.back}>

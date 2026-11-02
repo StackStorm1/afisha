@@ -10,7 +10,7 @@
 .topRow {
   max-width: var(--grid-max-width);
   margin: 0 auto;
-  padding: 14px 40px;
+  padding: 14px var(--grid-gutter);
   display: flex;
   align-items: center;
   gap: 18px;
@@ -128,7 +128,8 @@
   transition: background 0.12s;
 }
 
-.searchItem:hover {
+.searchItem:hover,
+.searchItem[aria-selected='true'] {
   background: var(--color-surface-hover);
 }
 
@@ -218,8 +219,8 @@
 }
 
 /* --- Адаптив хедера (issue #42) --- */
-/* Брейкпоинты и боковой отступ (40px) те же, что у Hero/Collections/EventPage,
-   чтобы содержимое хедера не разъезжалось по ширине с лентой карточек. */
+/* Брейкпоинты и боковой отступ (--grid-gutter) те же, что у Hero/Collections/
+   EventPage, чтобы содержимое хедера не разъезжалось по ширине с лентой карточек. */
 
 @media (max-width: 900px) {
   /* Верхний ряд перестаёт быть одной несжимаемой строкой: поиск уезжает на
@@ -252,6 +253,12 @@
 }
 
 @media (max-width: 600px) {
+  /* С фильтрами в четыре строки шапка закрывала почти половину экрана —
+     на телефоне она прокручивается вместе со страницей. */
+  .header[data-filters] {
+    position: static;
+  }
+
   /* Город — справочная подпись (MVP работает только по Москве): на телефоне
      убираем, чтобы освободить строку под логотип и кнопки. */
   .city {
@@ -262,8 +269,24 @@
     gap: 6px;
   }
 
-  .ghostButton,
   .loginButton {
     padding: 0 12px;
+  }
+
+  /* Три кнопки посетителя с подписями не помещаются рядом с логотипом
+     (на 390px — 419px). Остаются значки 44×44, подпись — для скринридера. */
+  .ghostButton {
+    min-width: 44px;
+    padding: 0 12px;
+    justify-content: center;
+  }
+
+  .buttonLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
