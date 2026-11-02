@@ -33,6 +33,20 @@ async def _admin(admin_url: str, *statements: str) -> None:
     await engine.dispose()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def no_background_expiry() -> Iterator[None]:
+    """TestClient поднимает lifespan, а с ним фоновую задачу BR-02.
+
+    Она пошла бы в базу из DATABASE_URL мимо транзакции теста. Тесты вызывают
+    expire_bookings напрямую.
+    """
+    os.environ["BOOKING_EXPIRY_ENABLED"] = "false"
+    _reset_caches()
+    yield
+    os.environ.pop("BOOKING_EXPIRY_ENABLED")
+    _reset_caches()
+
+
 @pytest.fixture(scope="session")
 def migrated_database() -> Iterator[None]:
     """Отдельная база со схемой: тесты не трогают данные разработчика."""
