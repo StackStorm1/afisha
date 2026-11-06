@@ -31,7 +31,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
         404: {"model": ErrorResponse, "description": "Ресурс не найден"},
         409: {
             "model": ErrorResponse,
-            "description": "Сеанс неактивен или место уже занято",
+            "description": "Сеанс неактивен, место уже занято или в стоячей зоне не хватает мест",
         },
         422: {
             "model": ErrorResponse,
@@ -45,7 +45,9 @@ async def create_order(
     db: DbSession,
     user: Annotated[User, Depends(current_user)],
 ):
-    order = await orders_service.create_order(db, body.session_id, body.seat_ids, user)
+    order = await orders_service.create_order(
+        db, body.session_id, body.seat_ids, body.standing, user
+    )
     return {"data": order.model_dump(mode="json")}
 
 

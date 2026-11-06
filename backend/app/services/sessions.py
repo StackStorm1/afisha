@@ -25,8 +25,6 @@ def _build_session(session, venue, city) -> SessionSchema:
         name=venue.name,
         address=venue.address,
         city=city_schema,
-        rows_count=venue.rows_count,
-        seats_per_row=venue.seats_per_row,
     )
     return SessionSchema(
         id=session.id,

@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int
 
     booking_hold_minutes: int = 15
+    # Фоновое освобождение протухших броней (BR-02). Выключается там, где
+    # задачу запускает кто-то другой, например в тестах.
+    booking_expiry_enabled: bool = True
+    booking_expiry_job_interval_seconds: int = 60
 
     api_prefix: str = "/api/v1"
     backend_cors_origins: str = "http://localhost"

@@ -2,26 +2,21 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from app.enums import SeatStatus
 from app.schemas.auth import AuthResponse, AuthResponseData, UserProfile, UserRole
 from app.schemas.categories import Category, CategoryCode
 from app.schemas.cities import City
 from app.schemas.events import AgeRating, EventBase, EventDetail, EventSummary
 from app.schemas.orders import (
     BookedSeat,
+    BookedSection,
+    BookedZone,
     OrderDetail,
     OrderEventRef,
     OrderSessionRef,
     OrderStatus,
     OrderVenueRef,
-    PriceCategory,
 )
 from app.schemas.primitives import Pagination
-from app.schemas.seatMap import (
-    SeatInfo,
-    SeatMap,
-    SeatRow,
-)
 from app.schemas.sessions import Session, SessionStatus
 from app.schemas.venues import Venue
 
@@ -33,12 +28,13 @@ EVENT_ID = UUID("b1c2d3e4-0000-0000-0000-000000000001")
 SESSION_ID = UUID("c1d2e3f4-0000-0000-0000-000000000001")
 ORDER_ID = UUID("e1f2a3b4-0000-0000-0000-000000000001")
 
+SECTION_ID = UUID("f1a2b3c4-0000-0000-0000-000000000001")
+PRICE_ZONE_ID = UUID("f1a2b3c4-0001-0000-0000-000000000001")
+
 SEAT_FREE_ID = UUID("a1b2c3d4-0001-0000-0000-000000000001")
-SEAT_HELD_ID = UUID("a1b2c3d4-0001-0000-0000-000000000002")
 TAKEN_SEAT_ID = UUID(
     "a1b2c3d4-0001-0000-0000-000000000003"
 )  # зарезервирован — вызывает SEAT_ALREADY_TAKEN
-SEAT_BALCONY_ID = UUID("a1b2c3d4-0002-0000-0000-000000000001")
 
 # ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -55,8 +51,6 @@ VENUE = Venue(
     name="Большой театр",
     address="Театральная пл., 1",
     city=CITY,
-    rows_count=20,
-    seats_per_row=30,
 )
 
 # ─── Events ──────────────────────────────────────────────────────────────────
@@ -114,58 +108,6 @@ SESSION = Session(
     status=SessionStatus.ACTIVE,
 )
 
-# ─── Seat map ────────────────────────────────────────────────────────────────
-
-SEAT_MAP = SeatMap(
-    session_id=SESSION_ID,
-    status=SessionStatus.ACTIVE,
-    price=Decimal("2000.00"),
-    rows=[
-        SeatRow(
-            row_no=1,
-            seats=[
-                SeatInfo(
-                    id=SEAT_FREE_ID,
-                    seat_no=1,
-                    price_category=PriceCategory.STALLS,
-                    price=Decimal("2000.00"),
-                    status=SeatStatus.HELD,
-                    held_by_me=True,
-                ),
-                SeatInfo(
-                    id=SEAT_HELD_ID,
-                    seat_no=2,
-                    price_category=PriceCategory.STALLS,
-                    price=Decimal("2000.00"),
-                    status=SeatStatus.FREE,
-                    held_by_me=False,
-                ),
-                SeatInfo(
-                    id=TAKEN_SEAT_ID,
-                    seat_no=3,
-                    price_category=PriceCategory.STALLS,
-                    price=Decimal("2000.00"),
-                    status=SeatStatus.HELD,
-                    held_by_me=False,
-                ),
-            ],
-        ),
-        SeatRow(
-            row_no=2,
-            seats=[
-                SeatInfo(
-                    id=SEAT_BALCONY_ID,
-                    seat_no=1,
-                    price_category=PriceCategory.BALCONY,
-                    price=Decimal("1600.00"),
-                    status=SeatStatus.FREE,
-                    held_by_me=False,
-                ),
-            ],
-        ),
-    ],
-)
-
 # ─── Auth ────────────────────────────────────────────────────────────────────
 
 USER = UserProfile(
@@ -205,16 +147,18 @@ ORDER = OrderDetail(
     seats=[
         BookedSeat(
             id=SEAT_FREE_ID,
-            row_no=1,
-            seat_no=1,
-            price_category=PriceCategory.STALLS,
+            section=BookedSection(id=SECTION_ID, name="Партер", kind="seated"),
+            row_label="1",
+            seat_label="1",
+            price_zone=BookedZone(id=PRICE_ZONE_ID, name="Партер"),
             price=Decimal("2000.00"),
         ),
         BookedSeat(
             id=TAKEN_SEAT_ID,
-            row_no=1,
-            seat_no=3,
-            price_category=PriceCategory.STALLS,
+            section=BookedSection(id=SECTION_ID, name="Партер", kind="seated"),
+            row_label="1",
+            seat_label="3",
+            price_zone=BookedZone(id=PRICE_ZONE_ID, name="Партер"),
             price=Decimal("2000.00"),
         ),
     ],

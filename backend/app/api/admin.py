@@ -1,9 +1,18 @@
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.deps import DbSession, require_admin
 from app.schemas.errors import ErrorResponse
 from app.schemas.events import CreateEventRequest, EventBaseResponse, UpdateEventRequest
+from app.schemas.hall_layouts import (
+    HallLayoutDraft,
+    HallLayoutListResponse,
+    HallLayoutResponse,
+    LayoutRevisionResponse,
+    SaveSessionHallRequest,
+    SessionHallResponse,
+)
 from app.schemas.seatMap import CreateSessionRequest
 from app.schemas.sessions import SessionResponse, UpdateSessionRequest
 from app.schemas.venues import (
@@ -12,6 +21,7 @@ from app.schemas.venues import (
     VenueListResponse,
     VenueResponse,
 )
+from app.services import layouts as layouts_service
 from app.stubs.fixtures import EVENT_BASE, PAGINATION, SESSION, VENUE
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -228,3 +238,121 @@ async def update_session(id: UUID, body: UpdateSessionRequest):
 )
 async def cancel_session(id: UUID):
     return {"data": SESSION.model_dump(mode="json")}
+
+
+# ─── Hall layouts ────────────────────────────────────────────────────────────
+
+_ADMIN_ERRORS = {
+    401: {
+        "model": ErrorResponse,
+        "description": "Токен отсутствует или недействителен",
+    },
+    403: {
+        "model": ErrorResponse,
+        "description": "Нет прав на ресурс (недостаточная роль)",
+    },
+    404: {"model": ErrorResponse, "description": "Ресурс не найден"},
+    500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
+}
+
+_VALIDATION = {
+    422: {
+        "model": ErrorResponse,
+        "description": "Нарушены правила валидации или ошибки схемы зала",
+    }
+}
+
+
+@router.get(
+    "/venues/{id}/layouts",
+    status_code=200,
+    response_model=HallLayoutListResponse,
+    summary="Конфигурации зала площадки",
+    description="По порядку, без архивных. Первая — конфигурация по умолчанию.",
+    dependencies=[Depends(require_admin)],
+    responses=_ADMIN_ERRORS,
+)
+async def list_venue_layouts(id: UUID, db: DbSession):
+    layouts = await layouts_service.list_venue_layouts(db, id)
+    return {"data": [layout.model_dump(mode="json") for layout in layouts]}
+
+
+@router.post(
+    "/venues/{id}/layouts",
+    status_code=201,
+    response_model=HallLayoutResponse,
+    summary="Новая конфигурация зала площадки",
+    dependencies=[Depends(require_admin)],
+    responses={**_ADMIN_ERRORS, **_VALIDATION},
+)
+async def create_venue_layout(id: UUID, body: HallLayoutDraft, db: DbSession):
+    layout = await layouts_service.create_layout(db, id, body)
+    return {"data": layout.model_dump(mode="json")}
+
+
+@router.get(
+    "/layouts/{id}",
+    status_code=200,
+    response_model=HallLayoutResponse,
+    summary="Конфигурация зала целиком: зоны, сектора, места",
+    dependencies=[Depends(require_admin)],
+    responses=_ADMIN_ERRORS,
+)
+async def get_layout(id: UUID, db: DbSession):
+    layout = await layouts_service.get_layout(db, id)
+    return {"data": layout.model_dump(mode="json")}
+
+
+@router.post(
+    "/layouts/{id}/revisions",
+    status_code=200,
+    response_model=LayoutRevisionResponse,
+    summary="Сохранить правку конфигурации зала",
+    description=(
+        "Конфигурация без сеансов меняется на месте. Если сеансы есть, "
+        "создаётся новая конфигурация на том же месте в списке площадки, а "
+        "старая уходит в архив и остаётся у своих сеансов."
+    ),
+    dependencies=[Depends(require_admin)],
+    responses={
+        **_ADMIN_ERRORS,
+        **_VALIDATION,
+        409: {"model": ErrorResponse, "description": "Конфигурация в архиве"},
+    },
+)
+async def save_layout_revision(id: UUID, body: HallLayoutDraft, db: DbSession):
+    layout, revision = await layouts_service.save_revision(db, id, body)
+    return {"data": layout.model_dump(mode="json"), "revision": revision}
+
+
+@router.get(
+    "/sessions/{id}/hall",
+    status_code=200,
+    response_model=SessionHallResponse,
+    summary="Конфигурация и цены зон сеанса",
+    dependencies=[Depends(require_admin)],
+    responses=_ADMIN_ERRORS,
+)
+async def get_session_hall(id: UUID, db: DbSession):
+    hall = await layouts_service.get_session_hall(db, id)
+    return {"data": hall.model_dump(mode="json")}
+
+
+@router.put(
+    "/sessions/{id}/hall",
+    status_code=200,
+    response_model=SessionHallResponse,
+    summary="Выбрать конфигурацию сеанса и задать цены зон",
+    dependencies=[Depends(require_admin)],
+    responses={
+        **_ADMIN_ERRORS,
+        **_VALIDATION,
+        409: {
+            "model": ErrorResponse,
+            "description": "На сеанс уже есть брони или заказы",
+        },
+    },
+)
+async def save_session_hall(id: UUID, body: SaveSessionHallRequest, db: DbSession):
+    hall = await layouts_service.save_session_hall(db, id, body)
+    return {"data": hall.model_dump(mode="json")}

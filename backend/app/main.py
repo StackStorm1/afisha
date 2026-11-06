@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -11,6 +13,8 @@ from app.api import admin, auth, categories, cities, events, orders, sessions
 from app.core.config import get_settings
 from app.core.errors import http_exception_handler, validation_exception_handler
 from app.core.logging import setup_logging
+from app.db.session import get_session_maker
+from app.services.booking_expiry import run_expiry_loop
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +23,21 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings = get_settings()
     setup_logging(settings.log_level)
+
+    expiry_task = None
+    if settings.booking_expiry_enabled:
+        expiry_task = asyncio.create_task(
+            run_expiry_loop(
+                get_session_maker(), settings.booking_expiry_job_interval_seconds
+            )
+        )
+
     yield
+
+    if expiry_task is not None:
+        expiry_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await expiry_task
 
 
 app = FastAPI(lifespan=lifespan)
