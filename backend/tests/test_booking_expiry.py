@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -10,14 +9,22 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
-from app.enums import BookingStatus, OrderStatus, PriceCategory
+from app.enums import BookingStatus, OrderStatus
 from app.models.bookings import Booking
 from app.models.categories import Category
 from app.models.cities import City
 from app.models.orders import Order
-from app.models.seats import Seat
 from app.services.booking_expiry import expire_bookings
-from tests.factories import make_event, make_session, make_user, make_venue
+from tests.factories import (
+    layout_draft,
+    make_event,
+    make_layout,
+    make_session,
+    make_user,
+    make_venue,
+    seated_seats,
+    section_by_name,
+)
 
 URL = "/api/v1/orders"
 
@@ -30,37 +37,30 @@ async def ctx(session: AsyncSession):
     category = (
         await session.execute(select(Category).where(Category.slug == "concert"))
     ).scalar_one()
-    venue = await make_venue(session, city, rows_count=1, seats_per_row=4)
+    venue = await make_venue(session, city)
+    layout = await make_layout(
+        session, venue, draft=layout_draft(rows=1, seats_per_row=4, standing_capacity=3)
+    )
     event = await make_event(session, category)
-    db_session = await make_session(session, event, venue, city)
+    db_session = await make_session(session, event, venue, city, layout=layout)
     user = await make_user(session)
-    seats = []
-    for seat_no in range(1, 5):
-        seat = Seat(
-            venue_id=venue.id,
-            row_no=1,
-            seat_no=seat_no,
-            price_category=PriceCategory.STALLS,
-            price_factor=Decimal("1.00"),
-        )
-        session.add(seat)
-        seats.append(seat)
-    await session.flush()
     token, _ = create_access_token(user.id)
     return SimpleNamespace(
         db_session=db_session,
         session_id=str(db_session.id),
-        seat_ids=[str(seat.id) for seat in seats],
+        seat_ids=[str(seat.id) for seat in await seated_seats(session, layout)],
+        floor_id=str((await section_by_name(session, layout, "Танцпол")).id),
         headers={"Authorization": f"Bearer {token}"},
     )
 
 
-async def _book(client: AsyncClient, ctx, seat_ids: list[str]) -> UUID:
-    r = await client.post(
-        URL,
-        json={"session_id": ctx.session_id, "seat_ids": seat_ids},
-        headers=ctx.headers,
-    )
+async def _book(
+    client: AsyncClient, ctx, seat_ids: list[str], standing: int = 0
+) -> UUID:
+    body = {"session_id": ctx.session_id, "seat_ids": seat_ids}
+    if standing:
+        body["standing"] = [{"section_id": ctx.floor_id, "quantity": standing}]
+    r = await client.post(URL, json=body, headers=ctx.headers)
     assert r.status_code == 201
     return UUID(r.json()["data"]["id"])
 
@@ -159,3 +159,14 @@ async def test_nothing_to_expire(client: AsyncClient, ctx, session: AsyncSession
     assert await expire_bookings(session) == 0
     await session.refresh(ctx.db_session)
     assert ctx.db_session.seats_available == ctx.db_session.seats_total
+
+
+@pytest.mark.asyncio
+async def test_standing_units_released(client: AsyncClient, ctx, session: AsyncSession):
+    """Истёкшие единицы танцпола снова продаются."""
+    order_id = await _book(client, ctx, [], standing=3)
+    await _age(session, order_id)
+
+    assert await expire_bookings(session) == 3
+
+    await _book(client, ctx, [], standing=3)

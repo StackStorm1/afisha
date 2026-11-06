@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
@@ -13,37 +14,63 @@ class OrderStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
-class PriceCategory(StrEnum):
-    STALLS = "stalls"
-    BALCONY = "balcony"
-
-
 from app.schemas.primitives import Money, Pagination
+
+MAX_TICKETS_PER_ORDER = 10
+
+
+class StandingRequest(BaseModel):
+    section_id: UUID = Field(..., description="Стоячая зона из схемы зала сеанса")
+    quantity: int = Field(..., ge=1, le=MAX_TICKETS_PER_ORDER, examples=[2])
 
 
 class CreateOrderRequest(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "description": (
+                "Места и билеты в стоячие зоны вместе — от 1 до "
+                f"{MAX_TICKETS_PER_ORDER} билетов. Стоячую зону покупают "
+                "количеством: конкретные единицы выбирает сервер."
+            )
+        }
+    )
     session_id: UUID
     seat_ids: list[UUID] = Field(
-        ...,
-        description="UUID мест, выбранных на схеме зала",
-        min_length=1,
-        max_length=10,
+        default_factory=list,
+        description="UUID мест сидячих секторов, выбранных на схеме зала",
+        max_length=MAX_TICKETS_PER_ORDER,
     )
+    standing: list[StandingRequest] = Field(
+        default_factory=list, max_length=MAX_TICKETS_PER_ORDER
+    )
+
+
+class BookedSection(BaseModel):
+    id: UUID
+    name: str = Field(..., examples=["Сектор A"])
+    kind: Literal["seated", "standing"]
+
+
+class BookedZone(BaseModel):
+    id: UUID
+    name: str = Field(..., examples=["Партер"])
 
 
 class BookedSeat(BaseModel):
     model_config = ConfigDict(
-        json_schema_extra={"description": "Место в составе заказа"}
+        json_schema_extra={
+            "description": (
+                "Билет в составе заказа: место сидячего сектора или единица "
+                "стоячей зоны. У единицы стоячей зоны ряд и место — null."
+            )
+        }
     )
 
     id: UUID
-    row_no: int = Field(..., ge=1, examples=[5])
-    seat_no: int = Field(..., ge=1, examples=[12])
-    price_category: PriceCategory = Field(
-        ...,
-        description="Ценовая категория места. В БД — в верхнем регистре.",
-        examples=["stalls"],
-    )
+    section: BookedSection
+    row_label: str | None = Field(..., examples=["5"])
+    seat_label: str | None = Field(..., examples=["12"])
+    price_zone: BookedZone
     price: Money
 
 
