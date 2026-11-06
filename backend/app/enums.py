@@ -21,9 +21,9 @@ class AgeRating(StrEnum):
     EIGHTEEN_PLUS = "18+"
 
 
-class PriceCategory(StrEnum):
-    STALLS = "STALLS"
-    BALCONY = "BALCONY"
+class SectionKind(StrEnum):
+    SEATED = "SEATED"
+    STANDING = "STANDING"
 
 
 class SessionStatus(StrEnum):

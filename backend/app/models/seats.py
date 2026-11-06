@@ -6,7 +6,6 @@ from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     Numeric,
-    SmallInteger,
     String,
     UniqueConstraint,
     text,
@@ -14,42 +13,52 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.enums import PriceCategory
 
 if TYPE_CHECKING:
     from app.models.bookings import Booking
-    from app.models.venues import Venue
+    from app.models.sections import Section
 
 
 class Seat(Base):
+    """Единица инвентаря конфигурации зала — то, что держит одна бронь.
+
+    У сидячего сектора это место с подписями ряда и места и центром на
+    холсте. Стоячая зона вместимостью N — это N безымянных единиц (подписи и
+    координаты пустые): бронь всегда держит конкретную строку, и BR-01
+    (uq_bookings_active_seat) защищает от перепродажи и места, и танцпол.
+    `unit_no` — порядковый номер единицы в секторе.
+
+    Ссылка на ценовую зону — CASCADE: зона и место живут в одной
+    конфигурации и удаляются её каскадом. С RESTRICT или NO ACTION удаление
+    конфигурации падает: проверка ссылки из мест срабатывает раньше, чем
+    каскад от сектора доходит до самих мест. Место с бронью удалить всё
+    равно нельзя — его держит RESTRICT со стороны bookings.
+    """
+
     __tablename__ = "seats"
 
     __table_args__ = (
-        CheckConstraint("row_no > 0", name="row_no"),
-        CheckConstraint("seat_no > 0", name="seat_no"),
-        CheckConstraint(
-            "price_category IN ('STALLS', 'BALCONY')", name="price_category"
-        ),
-        CheckConstraint("price_factor BETWEEN 0.10 AND 10.00", name="price_factor"),
-        UniqueConstraint(
-            "venue_id", "row_no", "seat_no", name="uq_seats_venue_row_seat"
-        ),
+        CheckConstraint("unit_no > 0", name="unit_no"),
+        CheckConstraint("(row_label IS NULL) = (seat_label IS NULL)", name="labels"),
+        UniqueConstraint("section_id", "unit_no", name="uq_seats_section_unit_no"),
     )
 
     id: Mapped[UUID] = mapped_column(
         primary_key=True, server_default=text("gen_random_uuid()")
     )
-    venue_id: Mapped[UUID] = mapped_column(
-        ForeignKey("venues.id", name="fk_seats_venue", ondelete="CASCADE")
+    section_id: Mapped[UUID] = mapped_column(
+        ForeignKey("sections.id", name="fk_seats_section", ondelete="CASCADE")
     )
-    row_no: Mapped[int] = mapped_column(SmallInteger())
-    seat_no: Mapped[int] = mapped_column(SmallInteger())
-    price_category: Mapped[PriceCategory] = mapped_column(String(20))
-    price_factor: Mapped[Decimal] = mapped_column(
-        Numeric(4, 2), server_default=text("1.00")
+    price_zone_id: Mapped[UUID] = mapped_column(
+        ForeignKey("price_zones.id", name="fk_seats_price_zone", ondelete="CASCADE")
     )
+    unit_no: Mapped[int] = mapped_column()
+    row_label: Mapped[str | None] = mapped_column(String(8))
+    seat_label: Mapped[str | None] = mapped_column(String(8))
+    x: Mapped[Decimal | None] = mapped_column(Numeric(7, 1))
+    y: Mapped[Decimal | None] = mapped_column(Numeric(7, 1))
 
-    venue: Mapped["Venue"] = relationship(back_populates="seats", lazy="raise")
+    section: Mapped["Section"] = relationship(back_populates="seats", lazy="raise")
     bookings: Mapped[list["Booking"]] = relationship(
         back_populates="seat", lazy="raise"
     )

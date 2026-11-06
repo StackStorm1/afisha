@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from app.models.bookings import Booking
     from app.models.cities import City
     from app.models.events import Event
+    from app.models.hall_layouts import HallLayout
     from app.models.orders import Order
     from app.models.venues import Venue
 
@@ -52,6 +53,11 @@ class Session(Base):
     venue_id: Mapped[UUID] = mapped_column(
         ForeignKey("venues.id", name="fk_sessions_venue", ondelete="RESTRICT")
     )
+    # Конфигурация зала, по которой продаётся сеанс. Цены зон —
+    # session_zone_prices, base_price — цена «от»: самая дешёвая зона.
+    layout_id: Mapped[UUID] = mapped_column(
+        ForeignKey("hall_layouts.id", name="fk_sessions_layout", ondelete="RESTRICT")
+    )
     city_id: Mapped[int] = mapped_column(
         SmallInteger(),
         ForeignKey("cities.id", name="fk_sessions_city", ondelete="RESTRICT"),
@@ -72,6 +78,7 @@ class Session(Base):
 
     event: Mapped["Event"] = relationship(back_populates="sessions", lazy="raise")
     venue: Mapped["Venue"] = relationship(back_populates="sessions", lazy="raise")
+    layout: Mapped["HallLayout"] = relationship(back_populates="sessions", lazy="raise")
     city: Mapped["City"] = relationship(back_populates="sessions", lazy="raise")
     bookings: Mapped[list["Booking"]] = relationship(
         back_populates="session", lazy="raise"
