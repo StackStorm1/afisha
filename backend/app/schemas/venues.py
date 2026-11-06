@@ -13,8 +13,6 @@ class Venue(BaseModel):
     name: str = Field(max_length=255, examples=["Большой театр"])
     address: str = Field(max_length=500, examples=["Театральная пл., 1"])
     city: City
-    rows_count: int = Field(ge=1, le=100, examples=[20])
-    seats_per_row: int = Field(ge=1, le=100, examples=[30])
 
 
 class CreateVenueRequest(BaseModel):
@@ -25,8 +23,6 @@ class CreateVenueRequest(BaseModel):
         description="ID города. В MVP единственный город — Москва (id=1).",
         examples=[1],
     )
-    rows_count: int = Field(..., ge=1, le=100, examples=[20])
-    seats_per_row: int = Field(..., ge=1, le=100, examples=[30])
 
 
 class UpdateVenueRequest(BaseModel):
@@ -34,8 +30,8 @@ class UpdateVenueRequest(BaseModel):
         json_schema_extra={
             "description": (
                 "Все поля опциональны — передавать только изменяемые. "
-                "Геометрия зала (`rows_count`, `seats_per_row`) и город не редактируются: "
-                "по ним уже сгенерированы места, на которые ссылаются брони (BR-08)."
+                "Город не редактируется. Схема зала задаётся конфигурациями "
+                "(`/admin/venues/{id}/layouts`)."
             )
         },
         extra="forbid",
