@@ -15,7 +15,20 @@ from app.cli import _factories
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.db.session import get_session_maker
-from app.models import Booking, Category, City, Event, Order, Seat, User, Venue
+from app.models import (
+    Booking,
+    Category,
+    City,
+    Event,
+    HallLayout,
+    Order,
+    PriceZone,
+    Seat,
+    Section,
+    SessionZonePrice,
+    User,
+    Venue,
+)
 from app.models import Session as SessionModel
 
 logger = logging.getLogger(__name__)
@@ -26,8 +39,12 @@ logger = logging.getLogger(__name__)
 TRUNCATE_TABLES = (
     "bookings",
     "orders",
+    "session_zone_prices",
     "sessions",
     "seats",
+    "sections",
+    "price_zones",
+    "hall_layouts",
     "events",
     "venues",
 )
@@ -141,6 +158,9 @@ async def _reference(session: AsyncSession) -> tuple[int, dict[str, int]]:
 
 
 async def _insert(session: AsyncSession, model: type, rows: list[dict]) -> None:
+    # Ключи с «_» — служебные поля фабрик (категория события, сетка зала,
+    # цены зон сеанса), в таблицах их нет.
+    rows = [{k: v for k, v in row.items() if not k.startswith("_")} for row in rows]
     for start in range(0, len(rows), CHUNK):
         await session.execute(insert(model), rows[start : start + CHUNK])
 
@@ -161,23 +181,20 @@ async def run(args: argparse.Namespace) -> None:
         city_id, category_ids = await _reference(session)
 
         venues = _factories.make_venues(rng, args.venues, city_id)
-        seats = _factories.make_seats(rng, venues)
+        layouts = _factories.make_layouts(rng, venues)
         buyers = _factories.make_buyers(rng, args.buyers, password_hash)
         events = _factories.make_events(rng, args.events, category_ids)
         sessions = _factories.make_sessions(
             rng,
             events,
             venues,
+            layouts,
             args.sessions_per_event,
             args.days,
             now,
             args.past_days,
             args.cancelled_percent,
         )
-
-        seats_by_venue: dict = {}
-        for seat in seats:
-            seats_by_venue.setdefault(seat["venue_id"], []).append(seat)
 
         owners = list(buyers)
         if args.orders_for_existing:
@@ -195,7 +212,7 @@ async def run(args: argparse.Namespace) -> None:
         orders, bookings, occupied = _factories.make_orders(
             rng,
             sessions,
-            seats_by_venue,
+            layouts.seats_of,
             owners,
             args.orders,
             settings.booking_hold_minutes,
@@ -204,10 +221,16 @@ async def run(args: argparse.Namespace) -> None:
         )
 
         await _insert(session, Venue, venues)
-        await _insert(session, Seat, seats)
+        await _insert(session, HallLayout, layouts.layouts)
+        await _insert(session, PriceZone, layouts.zones)
+        await _insert(session, Section, layouts.sections)
+        await _insert(session, Seat, layouts.seats)
         await _insert(session, User, buyers)
-        await _insert(session, Event, [_without_code(event) for event in events])
+        await _insert(session, Event, events)
         await _insert(session, SessionModel, sessions)
+        await _insert(
+            session, SessionZonePrice, _factories.session_zone_prices(sessions)
+        )
         await _insert(session, Order, orders)
         await _insert(session, Booking, bookings)
 
@@ -225,10 +248,11 @@ async def run(args: argparse.Namespace) -> None:
             )
 
     logger.info(
-        "создано: площадок %d, мест %d, покупателей %d, событий %d, "
-        "сеансов %d, заказов %d, броней %d",
+        "создано: площадок %d, конфигураций %d, мест %d, покупателей %d, "
+        "событий %d, сеансов %d, заказов %d, броней %d",
         len(venues),
-        len(seats),
+        len(layouts.layouts),
+        len(layouts.seats),
         len(buyers),
         len(events),
         len(sessions),
@@ -236,10 +260,6 @@ async def run(args: argparse.Namespace) -> None:
         len(bookings),
     )
     logger.info("пароль технических покупателей: %s", password)
-
-
-def _without_code(event: dict) -> dict:
-    return {key: value for key, value in event.items() if key != "_code"}
 
 
 def main() -> None:

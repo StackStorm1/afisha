@@ -143,3 +143,26 @@ def test_cancelled_sessions_are_free_of_active_bookings(seeded: None) -> None:
         WHERE s.status = 'CANCELLED' AND b.status IN ('HELD', 'PAID')
     """)
     assert scalar(query) == 0
+
+
+def test_every_session_has_a_price_for_each_zone(seeded: None) -> None:
+    query = text("""
+        SELECT count(*) FROM sessions s
+        JOIN price_zones z ON z.layout_id = s.layout_id
+        LEFT JOIN session_zone_prices p
+            ON p.session_id = s.id AND p.price_zone_id = z.id
+        WHERE p.price IS NULL
+    """)
+    assert scalar(query) == 0
+
+
+def test_seats_total_matches_layout_capacity(seeded: None) -> None:
+    query = text("""
+        SELECT count(*) FROM sessions s
+        WHERE s.seats_total <> (
+            SELECT count(*) FROM seats st
+            JOIN sections sec ON sec.id = st.section_id
+            WHERE sec.layout_id = s.layout_id
+        )
+    """)
+    assert scalar(query) == 0

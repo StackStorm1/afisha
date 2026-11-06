@@ -2,7 +2,6 @@
 
 import random
 from datetime import datetime
-from decimal import Decimal
 
 import pytest
 
@@ -15,22 +14,27 @@ NOW = datetime(2026, 9, 23, 12, 0, tzinfo=_factories.MSK)
 def build(seed: int, events: int = 20, venues: int = 3, days: int = 7) -> dict:
     rng = random.Random(seed)
     venue_rows = _factories.make_venues(rng, venues, city_id=1)
-    seats = _factories.make_seats(rng, venue_rows)
+    layouts = _factories.make_layouts(rng, venue_rows)
     buyers = _factories.make_buyers(rng, 3, "hash")
     event_rows = _factories.make_events(rng, events, CATEGORY_IDS)
     sessions = _factories.make_sessions(
-        rng, event_rows, venue_rows, 5, days, NOW, past_days=3, cancelled_percent=20
+        rng,
+        event_rows,
+        venue_rows,
+        layouts,
+        5,
+        days,
+        NOW,
+        past_days=3,
+        cancelled_percent=20,
     )
-
-    seats_by_venue: dict = {}
-    for seat in seats:
-        seats_by_venue.setdefault(seat["venue_id"], []).append(seat)
     orders, bookings, occupied = _factories.make_orders(
-        rng, sessions, seats_by_venue, buyers, 60, 15, NOW, sold_out=2
+        rng, sessions, layouts.seats_of, buyers, 60, 15, NOW, sold_out=2
     )
     return {
         "venues": venue_rows,
-        "seats": seats,
+        "layouts": layouts,
+        "seats": layouts.seats,
         "events": event_rows,
         "sessions": sessions,
         "orders": orders,
@@ -47,20 +51,36 @@ def test_different_seeds_give_different_data() -> None:
     assert build(42)["events"] != build(43)["events"]
 
 
-def test_seats_fill_the_grid() -> None:
+def test_one_build_gives_identical_layouts() -> None:
+    assert build(42)["layouts"] == build(42)["layouts"]
+
+
+def test_seats_match_layout_capacity() -> None:
+    layouts = build(1)["layouts"]
+    assert len(layouts.seats) == sum(layouts.capacity.values())
+    for layout_id, seats in layouts.seats_of.items():
+        assert len(seats) == layouts.capacity[layout_id]
+
+
+def test_arena_has_three_layouts_with_dance_floor() -> None:
     data = build(1)
-    expected = sum(v["rows_count"] * v["seats_per_row"] for v in data["venues"])
-    assert len(data["seats"]) == expected
+    layouts = data["layouts"]
+    arena, *halls = data["venues"]
+    names = [layout["name"] for layout in layouts.by_venue[arena["id"]]]
+    assert names == ["Танцпол + трибуны", "Сидячий партер", "Клубная"]
+    assert {s["kind"] for s in layouts.sections} == {"SEATED", "STANDING"}
+    for venue in halls:
+        assert [lt["name"] for lt in layouts.by_venue[venue["id"]]] == ["Основная"]
 
 
-def test_price_factors_split_stalls_and_balcony() -> None:
-    seats = build(1)["seats"]
-    stalls = [s["price_factor"] for s in seats if s["price_category"] == "STALLS"]
-    balcony = [s["price_factor"] for s in seats if s["price_category"] == "BALCONY"]
-
-    assert stalls and balcony
-    assert min(stalls) > max(balcony)
-    assert all(Decimal("0.10") <= f <= Decimal("10.00") for f in stalls + balcony)
+def test_zone_prices_grow_towards_the_stage() -> None:
+    data = build(1)
+    for session in data["sessions"]:
+        zones = data["layouts"].zones_of[session["layout_id"]]
+        prices = [session["_prices"][zone["id"]] for zone in zones]
+        assert prices == sorted(prices, reverse=True)
+        assert all(price % 100 == 0 for price in prices)
+        assert session["base_price"] == prices[-1] == min(prices)
 
 
 def test_sessions_do_not_share_a_slot() -> None:
@@ -72,10 +92,11 @@ def test_sessions_do_not_share_a_slot() -> None:
 def test_sessions_fail_loudly_when_slots_run_out() -> None:
     rng = random.Random(0)
     venues = _factories.make_venues(rng, 1, city_id=1)
+    layouts = _factories.make_layouts(rng, venues)
     events = _factories.make_events(rng, 50, CATEGORY_IDS)
 
     with pytest.raises(ValueError, match="слотов"):
-        _factories.make_sessions(rng, events, venues, 5, 1, NOW)
+        _factories.make_sessions(rng, events, venues, layouts, 5, 1, NOW)
 
 
 def test_events_respect_category_content() -> None:
@@ -112,16 +133,20 @@ def test_order_total_matches_its_bookings() -> None:
 
 
 def test_order_takes_adjacent_seats_in_one_row() -> None:
+    """Сидячий заказ — соседние места одного ряда, стоячий — одна зона."""
     data = build(7)
     seats = {seat["id"]: seat for seat in data["seats"]}
     by_order: dict = {}
     for booking in data["bookings"]:
         by_order.setdefault(booking["order_id"], []).append(seats[booking["seat_id"]])
 
+    kinds = set()
     for row_seats in by_order.values():
-        numbers = sorted(seat["seat_no"] for seat in row_seats)
-        assert len({seat["row_no"] for seat in row_seats}) == 1
+        numbers = sorted(seat["_pos"] for seat in row_seats)
+        assert len({seat["_row"] for seat in row_seats}) == 1
         assert numbers == list(range(numbers[0], numbers[0] + len(numbers)))
+        kinds.add(row_seats[0]["row_label"] is None)
+    assert kinds == {True, False}
 
 
 def test_occupied_counts_only_active_bookings() -> None:

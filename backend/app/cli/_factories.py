@@ -1,12 +1,16 @@
 """Фабрики строк для генератора. В базу не ходят, возвращают списки словарей."""
 
+import math
 import random
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, timezone
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import Decimal
 
 from app.cli import _content
-from app.enums import BookingStatus, OrderStatus, PriceCategory, SessionStatus, UserRole
+from app.enums import BookingStatus, OrderStatus, SessionStatus, UserRole
+from app.services.hall_geometry import js_round, layout_capacity, rect_shape
+from app.services.layouts import materialize
 
 MSK = timezone(timedelta(hours=3))
 SLOT_TIMES = (
@@ -17,12 +21,15 @@ SLOT_TIMES = (
     time(21, 0),
     time(22, 30),
 )
-CENT = Decimal("0.01")
+CANVAS_WIDTH = 840
+CANVAS_HEIGHT = 640
 
-_STALLS_TOP = Decimal("1.50")
-_BALCONY_TOP = Decimal("0.95")
-_ROW_STEP = Decimal("0.02")
-_FACTOR_FLOOR = Decimal("0.70")
+# Балкон у сидячих залов — последние ~30% рядов (getBalconyStartRow на фронте).
+_BALCONY_SHARE = 0.3
+
+# Цены зон от самой дешёвой (последней по sort_order): зоны ближе к сцене
+# дороже. Как seedPrices в frontend/src/data/hallLayouts.js.
+_ZONE_PRICE_FACTORS = (1, 1.6, 2.2, 3)
 
 
 def new_uuid(rng: random.Random) -> uuid.UUID:
@@ -43,37 +50,224 @@ def make_venues(rng: random.Random, count: int, city_id: int) -> list[dict]:
                 "city_id": city_id,
                 "name": name,
                 "address": address,
-                "rows_count": rng.choice((15, 18, 20, 22, 25)),
-                "seats_per_row": rng.choice((20, 24, 28, 30, 34)),
+                # Сетка зала: из неё строится конфигурация «Основная».
+                "_rows": rng.choice((15, 18, 20, 22, 25)),
+                "_seats": rng.choice((20, 24, 28, 30, 34)),
             }
         )
     return venues
 
 
-def make_seats(rng: random.Random, venues: list[dict]) -> list[dict]:
-    seats = []
-    for venue in venues:
-        stalls_rows = max(1, round(venue["rows_count"] * 0.6))
-        for row_no in range(1, venue["rows_count"] + 1):
-            if row_no <= stalls_rows:
-                category = PriceCategory.STALLS
-                factor = _STALLS_TOP - _ROW_STEP * (row_no - 1)
-            else:
-                category = PriceCategory.BALCONY
-                factor = _BALCONY_TOP - _ROW_STEP * (row_no - stalls_rows - 1)
-            factor = max(factor, _FACTOR_FLOOR)
-            for seat_no in range(1, venue["seats_per_row"] + 1):
-                seats.append(
-                    {
-                        "id": new_uuid(rng),
-                        "venue_id": venue["id"],
-                        "row_no": row_no,
-                        "seat_no": seat_no,
-                        "price_category": category.value,
-                        "price_factor": factor,
-                    }
+# ─── Конфигурации зала ───────────────────────────────────────────────────────
+
+
+def _zone(key: str, name: str, sort_order: int) -> dict:
+    return {"id": key, "name": name, "sort_order": sort_order}
+
+
+def _seated(
+    name: str,
+    rect: tuple[int, int, int, int],
+    rows: int,
+    seats_first: int,
+    seats_last: int,
+    ranges: list[tuple[int, int, str]],
+    sort_order: int,
+) -> dict:
+    return {
+        "name": name,
+        "kind": "seated",
+        "shape": rect_shape(*rect),
+        "sort_order": sort_order,
+        "generator": {
+            "rows_count": rows,
+            "seats_first": seats_first,
+            "seats_last": seats_last,
+            "numbering": "numeric",
+            "zone_ranges": [
+                {"from_row": a, "to_row": b, "price_zone_id": zone}
+                for a, b, zone in ranges
+            ],
+        },
+    }
+
+
+def _standing(
+    name: str,
+    rect: tuple[int, int, int, int],
+    capacity: int,
+    zone: str,
+    sort_order: int,
+) -> dict:
+    return {
+        "name": name,
+        "kind": "standing",
+        "shape": rect_shape(*rect),
+        "sort_order": sort_order,
+        "price_zone_id": zone,
+        "capacity": capacity,
+    }
+
+
+def _draft(name: str, description: str, zones: list[dict], sections: list[dict]):
+    return {
+        "name": name,
+        "description": description,
+        "canvas_width": CANVAS_WIDTH,
+        "canvas_height": CANVAS_HEIGHT,
+        "price_zones": zones,
+        "sections": sections,
+    }
+
+
+def _hall_draft(rows: int, seats: int) -> dict:
+    """Весь зал сидячий: партер и балкон (последние ~30% рядов)."""
+    balcony_start = math.ceil(rows * (1 - _BALCONY_SHARE)) + 1
+    return _draft(
+        "Основная",
+        "Весь зал сидячий: партер и балкон.",
+        [_zone("stalls", "Партер", 1), _zone("balcony", "Балкон", 2)],
+        [
+            _seated(
+                "Зал",
+                (60, 110, 720, 480),
+                rows,
+                seats,
+                seats,
+                [(1, balcony_start - 1, "stalls"), (balcony_start, rows, "balcony")],
+                1,
+            )
+        ],
+    )
+
+
+def _arena_drafts() -> list[dict]:
+    """Три конфигурации большой площадки, как на экране выбора в админке."""
+    side_a = ((60, 120, 200, 220), 8, 26, 35)
+    side_c = ((580, 120, 200, 220), 8, 26, 35)
+    dance = _draft(
+        "Танцпол + трибуны",
+        "Партер стоячий, сектора A–C сидячие.",
+        [
+            _zone("vip", "VIP", 1),
+            _zone("stand", "Трибуна", 2),
+            _zone("floor", "Танцпол", 3),
+            _zone("balcony", "Балкон", 4),
+        ],
+        [
+            _standing("Танцпол", (300, 120, 240, 170), 1800, "floor", 1),
+            _seated("Сектор A", *side_a, [(1, 8, "balcony")], 2),
+            _seated(
+                "Сектор B",
+                (200, 380, 440, 180),
+                12,
+                24,
+                36,
+                [(1, 2, "vip"), (3, 12, "stand")],
+                3,
+            ),
+            _seated("Сектор C", *side_c, [(1, 8, "balcony")], 4),
+        ],
+    )
+    seated = _draft(
+        "Сидячий партер",
+        "Вместо танцпола 24 ряда кресел.",
+        [
+            _zone("stalls", "Партер", 1),
+            _zone("stand", "Трибуна", 2),
+            _zone("balcony", "Балкон", 3),
+        ],
+        [
+            _seated("Партер", (280, 110, 280, 260), 24, 48, 56, [(1, 24, "stalls")], 1),
+            _seated("Сектор A", (40, 120, 200, 220), 8, 26, 35, [(1, 8, "balcony")], 2),
+            _seated(
+                "Сектор B", (200, 400, 440, 180), 12, 24, 36, [(1, 12, "stand")], 3
+            ),
+            _seated(
+                "Сектор C", (600, 120, 200, 220), 8, 26, 35, [(1, 8, "balcony")], 4
+            ),
+        ],
+    )
+    club = _draft(
+        "Клубная",
+        "Только танцпол, трибуны закрыты.",
+        [_zone("floor", "Танцпол", 1)],
+        [_standing("Танцпол", (200, 120, 440, 260), 1800, "floor", 1)],
+    )
+    return [dance, seated, club]
+
+
+@dataclass
+class Layouts:
+    """Строки конфигураций всех площадок и то, что нужно сеансам и заказам."""
+
+    layouts: list[dict] = field(default_factory=list)
+    zones: list[dict] = field(default_factory=list)
+    sections: list[dict] = field(default_factory=list)
+    seats: list[dict] = field(default_factory=list)
+    by_venue: dict[uuid.UUID, list[dict]] = field(default_factory=dict)
+    capacity: dict[uuid.UUID, int] = field(default_factory=dict)
+    zones_of: dict[uuid.UUID, list[dict]] = field(default_factory=dict)
+    seats_of: dict[uuid.UUID, list[dict]] = field(default_factory=dict)
+
+
+def make_layouts(rng: random.Random, venues: list[dict]) -> Layouts:
+    """У первой площадки — три конфигурации арены, у остальных — «Основная»."""
+    result = Layouts()
+    for index, venue in enumerate(venues):
+        drafts = (
+            _arena_drafts()
+            if index == 0
+            else [_hall_draft(venue["_rows"], venue["_seats"])]
+        )
+        for position, draft in enumerate(drafts):
+            layout = {
+                "id": new_uuid(rng),
+                "venue_id": venue["id"],
+                "name": draft["name"],
+                "description": draft["description"],
+                "canvas_width": draft["canvas_width"],
+                "canvas_height": draft["canvas_height"],
+                "position": position,
+            }
+            rows = materialize(draft, layout["id"], lambda: new_uuid(rng))
+            kinds = {section["id"]: section for section in rows.sections}
+            for seat in rows.seats:
+                section = kinds[seat["section_id"]]
+                # Позиция для поиска соседних мест: номер места в ряду или
+                # номер единицы стоячей зоны.
+                seat["_row"] = (seat["section_id"], seat["row_label"])
+                seat["_pos"] = (
+                    int(seat["seat_label"])
+                    if seat["seat_label"] is not None
+                    else seat["unit_no"]
                 )
-    return seats
+                seat["_section"] = section["name"]
+
+            result.layouts.append(layout)
+            result.zones.extend(rows.zones)
+            result.sections.extend(rows.sections)
+            result.seats.extend(rows.seats)
+            result.by_venue.setdefault(venue["id"], []).append(layout)
+            result.capacity[layout["id"]] = layout_capacity(draft["sections"])
+            result.zones_of[layout["id"]] = sorted(
+                rows.zones, key=lambda zone: zone["sort_order"]
+            )
+            result.seats_of[layout["id"]] = rows.seats
+    return result
+
+
+def zone_prices(zones: list[dict], base_price: Decimal) -> dict[uuid.UUID, Decimal]:
+    """Цены зон сеанса: самая дешёвая — от base_price, ближе к сцене дороже.
+
+    Округление до 100 ₽ — так выглядят цены живых афиш.
+    """
+    prices = {}
+    for i, zone in enumerate(zones):
+        from_cheapest = len(zones) - 1 - i
+        factor = _ZONE_PRICE_FACTORS[min(from_cheapest, len(_ZONE_PRICE_FACTORS) - 1)]
+        prices[zone["id"]] = Decimal(js_round(float(base_price) * factor / 100) * 100)
+    return prices
 
 
 def make_buyers(rng: random.Random, count: int, password_hash: str) -> list[dict]:
@@ -132,6 +326,7 @@ def make_sessions(
     rng: random.Random,
     events: list[dict],
     venues: list[dict],
+    layouts: Layouts,
     per_event: int,
     days: int,
     now: datetime,
@@ -154,20 +349,37 @@ def make_sessions(
         for _ in range(count):
             venue, starts_at = slots[slot_index]
             slot_index += 1
-            seats_total = venue["rows_count"] * venue["seats_per_row"]
+            # У арены сеансы раскиданы по всем трём конфигурациям: так в
+            # данных есть и танцпол, и полностью сидячий зал.
+            layout = rng.choice(layouts.by_venue[venue["id"]])
+            prices = zone_prices(
+                layouts.zones_of[layout["id"]],
+                Decimal(rng.randrange(low, high + 1, 50)),
+            )
+            seats_total = layouts.capacity[layout["id"]]
             sessions.append(
                 {
                     "id": new_uuid(rng),
                     "event_id": event["id"],
                     "venue_id": venue["id"],
+                    "layout_id": layout["id"],
                     "starts_at": starts_at,
-                    "base_price": Decimal(rng.randrange(low, high + 1, 50)),
+                    "base_price": min(prices.values()),
                     "seats_total": seats_total,
                     "seats_available": seats_total,
                     "status": _session_status(rng, starts_at, now, cancelled_percent),
+                    "_prices": prices,
                 }
             )
     return sessions
+
+
+def session_zone_prices(sessions: list[dict]) -> list[dict]:
+    return [
+        {"session_id": session["id"], "price_zone_id": zone_id, "price": price}
+        for session in sessions
+        for zone_id, price in session["_prices"].items()
+    ]
 
 
 def _session_status(
@@ -180,16 +392,20 @@ def _session_status(
     return SessionStatus.ACTIVE.value
 
 
-def _rows_of(seats: list[dict]) -> dict[int, list[dict]]:
-    rows: dict[int, list[dict]] = {}
+Rows = dict[tuple, list[dict]]
+
+
+def _rows_of(seats: list[dict]) -> Rows:
+    """Ряды сидячих секторов и стоячие зоны целиком — по позиции."""
+    rows: Rows = {}
     for seat in seats:
-        rows.setdefault(seat["row_no"], []).append(seat)
+        rows.setdefault(seat["_row"], []).append(seat)
     for row in rows.values():
-        row.sort(key=lambda seat: seat["seat_no"])
+        row.sort(key=lambda seat: seat["_pos"])
     return rows
 
 
-def _take_any(rng: random.Random, rows: dict[int, list[dict]]) -> list[dict]:
+def _take_any(rng: random.Random, rows: Rows) -> list[dict]:
     for size in (4, 3, 2, 1):
         picked = _take_adjacent(rng, rows, size)
         if picked:
@@ -197,14 +413,12 @@ def _take_any(rng: random.Random, rows: dict[int, list[dict]]) -> list[dict]:
     return []
 
 
-def _take_adjacent(
-    rng: random.Random, rows: dict[int, list[dict]], size: int
-) -> list[dict]:
+def _take_adjacent(rng: random.Random, rows: Rows, size: int) -> list[dict]:
     candidates = [
         (row_no, start)
         for row_no, row in rows.items()
         for start in range(len(row) - size + 1)
-        if row[start + size - 1]["seat_no"] - row[start]["seat_no"] == size - 1
+        if row[start + size - 1]["_pos"] - row[start]["_pos"] == size - 1
     ]
     if not candidates:
         return []
@@ -212,11 +426,8 @@ def _take_adjacent(
     return rows[row_no][start : start + size]
 
 
-def _price(base: Decimal, factor: Decimal) -> Decimal:
-    return (base * factor).quantize(CENT, rounding=ROUND_HALF_EVEN)
-
-
 _PAID_PAIR = (OrderStatus.PAID.value, BookingStatus.PAID.value, "paid")
+_STALE_PAIR = (OrderStatus.PENDING.value, BookingStatus.HELD.value, "stale")
 
 
 def _forced_pair(
@@ -235,14 +446,14 @@ def _status_pair(rng: random.Random) -> tuple[str, str, str]:
     if roll < 0.80:
         return OrderStatus.PENDING.value, BookingStatus.HELD.value, "live"
     if roll < 0.85:
-        return OrderStatus.PENDING.value, BookingStatus.HELD.value, "stale"
+        return _STALE_PAIR
     return OrderStatus.CANCELLED.value, BookingStatus.EXPIRED.value, "expired"
 
 
 def make_orders(
     rng: random.Random,
     sessions: list[dict],
-    seats_by_venue: dict[uuid.UUID, list[dict]],
+    seats_by_layout: dict[uuid.UUID, list[dict]],
     buyers: list[dict],
     count: int,
     hold_minutes: int,
@@ -253,7 +464,7 @@ def make_orders(
     # не должно.
     sellable = [s for s in sessions if s["status"] != SessionStatus.CANCELLED.value]
     sold = rng.sample(sellable, k=min(len(sellable), max(1, count // 3)))
-    free: dict[uuid.UUID, dict[int, list[dict]]] = {}
+    free: dict[uuid.UUID, Rows] = {}
 
     orders: list[dict] = []
     bookings: list[dict] = []
@@ -283,9 +494,7 @@ def make_orders(
 
         order_id = new_uuid(rng)
         buyer = rng.choice(buyers)
-        prices = [
-            _price(session["base_price"], seat["price_factor"]) for seat in picked
-        ]
+        prices = [session["_prices"][seat["price_zone_id"]] for seat in picked]
         orders.append(
             {
                 "id": order_id,
@@ -317,18 +526,34 @@ def make_orders(
             occupied[session["id"]] = occupied.get(session["id"], 0) + len(picked)
             rows = free[session["id"]]
             for seat in picked:
-                rows[seat["row_no"]].remove(seat)
+                rows[seat["_row"]].remove(seat)
 
-    def rows_of(session: dict) -> dict[int, list[dict]]:
+    def rows_of(session: dict) -> Rows:
         return free.setdefault(
-            session["id"], _rows_of(seats_by_venue[session["venue_id"]])
+            session["id"], _rows_of(seats_by_layout[session["layout_id"]])
         )
 
+    kinds = set()
     for _ in range(count):
         session = rng.choice(sold)
         picked = _take_adjacent(rng, rows_of(session), rng.randint(1, 4))
         if picked:
-            place(session, picked, _forced_pair(rng, session, now))
+            pair = _forced_pair(rng, session, now)
+            kinds.add(pair[2])
+            place(session, picked, pair)
+
+    # Протухшая бронь нужна в любых объёмах: на ней видно работу фоновой
+    # задачи BR-02. При малом --orders случай мог её не выдать.
+    if "stale" not in kinds:
+        for session in sold:
+            picked = (
+                _take_adjacent(rng, rows_of(session), 1)
+                if session["starts_at"] > now
+                else []
+            )
+            if picked:
+                place(session, picked, _STALE_PAIR)
+                break
 
     # Полностью распроданные сеансы: без них UI не покажет состояние «продано».
     upcoming = [s for s in sellable if s["starts_at"] > now]
